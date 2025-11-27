@@ -713,6 +713,25 @@ export function PodsLiteForm({ onSubmit, onCancel, prefill }: PodsLiteFormProps)
         </div>
       </div>
 
+      {/* Validation Summary - shown when form is incomplete */}
+      {!isFormValid && (
+        <div className="bg-warning-50 border border-warning-200 rounded-lg p-3">
+          <p className="text-sm text-warning-700 font-medium mb-2">Please complete all required fields:</p>
+          <ul className="text-xs text-warning-600 space-y-1 list-disc list-inside">
+            {formData.vendorName.length < 2 && <li>Company name (min 2 characters)</li>}
+            {formData.contactName.length < 2 && <li>Primary contact name (min 2 characters)</li>}
+            {!formData.contactEmail.includes("@") && <li>Valid email address</li>}
+            {formData.applicationName.length < 2 && <li>Product/application name (min 2 characters)</li>}
+            {formData.applicationDescription.length < 10 && <li>Brief description (min 10 characters)</li>}
+            {formData.dataElementsRequested.length < 1 && <li>At least one data element</li>}
+            {formData.dataPurpose.length < 10 && <li>Data usage purpose (min 10 characters)</li>}
+            {!formData.coppaCompliant && <li>COPPA compliance acknowledgment</li>}
+            {!formData.acceptsTerms && <li>Terms & conditions acceptance</li>}
+            {!formData.acceptsDataDeletion && <li>Data deletion agreement</li>}
+          </ul>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
         <button
