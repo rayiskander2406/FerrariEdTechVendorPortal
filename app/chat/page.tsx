@@ -302,8 +302,7 @@ export default function ChatPage() {
 
   const handleSuggestionSelect = useCallback(
     (suggestion: string) => {
-      setInputValue(suggestion);
-      // Auto-send suggestion
+      // Send directly without setting input value
       sendMessage(suggestion);
     },
     [sendMessage]
