@@ -48,6 +48,12 @@ export default function ChatPage() {
 
   // Local state
   const [inputValue, setInputValue] = useState("");
+
+  // Ref to always have latest sendMessage function
+  const sendMessageRef = useRef(sendMessage);
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -302,10 +308,10 @@ export default function ChatPage() {
 
   const handleSuggestionSelect = useCallback(
     (suggestion: string) => {
-      // Send directly without setting input value
-      sendMessage(suggestion);
+      // Use ref to always get latest sendMessage function
+      sendMessageRef.current(suggestion);
     },
-    [sendMessage]
+    [] // No dependencies needed since we use ref
   );
 
   const handleCloseForm = useCallback(() => {
