@@ -487,7 +487,7 @@ export function getOneRosterResponse(
 
   switch (endpoint) {
     case "/users": {
-      let users: OneRosterUser[] = [];
+      const users: OneRosterUser[] = [];
 
       // Add students
       if (!filters?.role || filters.role === "student") {

@@ -284,7 +284,7 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
           <p className="text-xs text-error-600">{errors.recipientToken}</p>
         )}
         <p className="text-xs text-gray-500">
-          Messages are routed through SchoolDay's privacy relay - no real contact info is exposed
+          Messages are routed through SchoolDay&apos;s privacy relay - no real contact info is exposed
         </p>
       </div>
 

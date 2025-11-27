@@ -91,7 +91,7 @@ function highlightJson(json: string): React.ReactNode[] {
       if (keyMatch) {
         parts.push(
           <span key={`${lineIndex}-${keyIndex++}`} className="text-cyan-400">
-            "{keyMatch[1]}"
+            &quot;{keyMatch[1]}&quot;
           </span>
         );
         parts.push(
@@ -108,7 +108,7 @@ function highlightJson(json: string): React.ReactNode[] {
       if (stringMatch) {
         parts.push(
           <span key={`${lineIndex}-${keyIndex++}`} className="text-emerald-400">
-            "{stringMatch[1]}"
+            &quot;{stringMatch[1]}&quot;
           </span>
         );
         remaining = remaining.slice(stringMatch[0].length);

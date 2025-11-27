@@ -8,7 +8,6 @@
 import {
   getMockPodsDatabase,
   getOneRosterResponse,
-  SYNTHETIC_DATA,
 } from "@/lib/data/synthetic";
 import {
   getVendor,

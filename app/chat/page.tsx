@@ -2,12 +2,28 @@
 
 import { useRef, useEffect, useState, useCallback, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { Send, CheckCircle2, Loader2, AlertCircle, X, Building2 } from "lucide-react";
+import { Send, CheckCircle2, Loader2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/lib/hooks/useChat";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { SuggestionChips } from "@/components/chat/SuggestionChips";
+import { useToast } from "@/components/ui/Toast";
+
+// Form components
+import { PodsLiteForm } from "@/components/forms/PodsLiteForm";
+import { SsoConfigForm, type SsoConfig } from "@/components/forms/SsoConfigForm";
+import { ApiTester } from "@/components/forms/ApiTester";
+import { CommTestForm, type CommMessage } from "@/components/forms/CommTestForm";
+import { AppSubmitForm, type AppSubmission } from "@/components/forms/AppSubmitForm";
+import { CredentialsDisplay } from "@/components/dashboard/CredentialsDisplay";
+import { AuditLogViewer } from "@/components/dashboard/AuditLogViewer";
+
+// DB functions
+import { createVendor, createSandbox, logAuditEvent, getAuditLogs } from "@/lib/db";
+
+// Types
+import type { PodsLiteInput, AuditLog } from "@/lib/types";
 
 // =============================================================================
 // CHAT PAGE
@@ -23,11 +39,16 @@ export default function ChatPage() {
     error,
     sendMessage,
     setActiveForm,
+    updateVendorState,
     clearError,
   } = useChat();
 
+  // Toast notifications
+  const toast = useToast();
+
   // Local state
   const [inputValue, setInputValue] = useState("");
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -37,10 +58,225 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, activeForm]);
 
   // ==========================================================================
-  // HANDLERS
+  // SHOW TOAST ON ERROR
+  // ==========================================================================
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error, toast]);
+
+  // ==========================================================================
+  // HELPER: Add system message to chat
+  // ==========================================================================
+
+  const addSystemMessage = useCallback((content: string) => {
+    // This is a workaround since we can't directly add messages
+    // In production, this would be handled by the useChat hook
+    console.log("[System Message]", content);
+  }, []);
+
+  // ==========================================================================
+  // FORM SUBMISSION HANDLERS
+  // ==========================================================================
+
+  /**
+   * Handle PoDS-Lite form submission
+   * Creates vendor and sandbox credentials
+   */
+  const handlePodsLiteSubmit = useCallback(
+    async (data: PodsLiteInput) => {
+      try {
+        // Create vendor
+        const vendor = await createVendor({ podsLiteInput: data });
+
+        // Create sandbox credentials
+        const creds = await createSandbox(vendor.id);
+
+        // Update vendor state
+        updateVendorState({
+          isOnboarded: true,
+          vendorId: vendor.id,
+          companyName: data.vendorName,
+          accessTier: vendor.accessTier,
+          podsStatus: vendor.podsStatus,
+          credentials: creds,
+        });
+
+        // Show credentials display
+        setActiveForm("credentials");
+
+        // Show success toast
+        toast.success(`Welcome ${data.vendorName}! Your PoDS-Lite application has been approved.`);
+
+        addSystemMessage(
+          `Welcome ${data.vendorName}! Your PoDS-Lite application has been approved with ${vendor.accessTier} access. Your sandbox credentials are ready.`
+        );
+      } catch (err) {
+        console.error("Failed to create vendor:", err);
+        toast.error("Failed to create vendor. Please try again.");
+        throw err;
+      }
+    },
+    [updateVendorState, setActiveForm, addSystemMessage, toast]
+  );
+
+  /**
+   * Handle SSO configuration submission
+   */
+  const handleSsoSubmit = useCallback(
+    async (config: SsoConfig) => {
+      try {
+        // Log the SSO configuration
+        if (vendorState.vendorId) {
+          await logAuditEvent({
+            vendorId: vendorState.vendorId,
+            action: "config.sso",
+            resourceType: "integration",
+            resourceId: `sso_${config.provider.toLowerCase()}`,
+            details: {
+              provider: config.provider,
+              scopes: config.scopes,
+              launchUrl: config.launchUrl,
+            },
+          });
+        }
+
+        // Update vendor state with SSO integration
+        updateVendorState({
+          integrations: [
+            ...vendorState.integrations,
+            {
+              id: crypto.randomUUID(),
+              vendorId: vendorState.vendorId ?? "",
+              type: "SSO",
+              status: "ACTIVE",
+              ssoProvider: config.provider === "SCHOOLOGY" ? "CLEVER" : config.provider === "CLEVER" ? "CLEVER" : "GOOGLE",
+              ssoRedirectUri: config.redirectUri,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        });
+
+        setActiveForm(null);
+
+        // Show success toast
+        toast.success(`SSO configuration for ${config.provider} saved successfully.`);
+
+        addSystemMessage(
+          `SSO configuration for ${config.provider} has been saved successfully.`
+        );
+      } catch (err) {
+        console.error("Failed to save SSO config:", err);
+        toast.error("Failed to save SSO configuration. Please try again.");
+        throw err;
+      }
+    },
+    [vendorState, updateVendorState, setActiveForm, addSystemMessage, toast]
+  );
+
+  /**
+   * Handle communication test submission
+   */
+  const handleCommSubmit = useCallback(
+    async (msg: CommMessage) => {
+      try {
+        // Log the message send
+        if (vendorState.vendorId) {
+          await logAuditEvent({
+            vendorId: vendorState.vendorId,
+            action: "comm.sent",
+            resourceType: "message",
+            resourceId: `msg_${Date.now()}`,
+            details: {
+              channel: msg.channel,
+              recipientToken: msg.recipientToken,
+              subject: msg.subject,
+              bodyLength: msg.body.length,
+            },
+          });
+        }
+
+        setActiveForm(null);
+
+        // Show success toast
+        toast.success(`Test ${msg.channel} message queued for delivery.`);
+
+        addSystemMessage(
+          `Test ${msg.channel} message queued for delivery to ${msg.recipientToken.substring(0, 16)}...`
+        );
+      } catch (err) {
+        console.error("Failed to send message:", err);
+        toast.error("Failed to send test message. Please try again.");
+        throw err;
+      }
+    },
+    [vendorState, setActiveForm, addSystemMessage, toast]
+  );
+
+  /**
+   * Handle app submission
+   */
+  const handleAppSubmit = useCallback(
+    async (submission: AppSubmission) => {
+      try {
+        // Log the app submission
+        if (vendorState.vendorId) {
+          await logAuditEvent({
+            vendorId: vendorState.vendorId,
+            action: "pods.submitted",
+            resourceType: "application",
+            resourceId: `app_${Date.now()}`,
+            details: {
+              appName: submission.appName,
+              category: submission.category,
+              targetGrades: submission.targetGrades,
+              subjects: submission.subjects,
+            },
+          });
+        }
+
+        setActiveForm(null);
+
+        // Show success toast
+        toast.success(`App "${submission.appName}" submitted for review.`);
+
+        addSystemMessage(
+          `Your app "${submission.appName}" has been submitted to the freemium catalog for review.`
+        );
+      } catch (err) {
+        console.error("Failed to submit app:", err);
+        toast.error("Failed to submit app. Please try again.");
+        throw err;
+      }
+    },
+    [vendorState, setActiveForm, addSystemMessage, toast]
+  );
+
+  /**
+   * Handle showing audit logs
+   */
+  const handleShowAuditLogs = useCallback(async () => {
+    if (vendorState.vendorId) {
+      const logs = await getAuditLogs(vendorState.vendorId);
+      setAuditLogs(logs);
+    }
+  }, [vendorState.vendorId]);
+
+  // Load audit logs when audit_log form is shown
+  useEffect(() => {
+    if (activeForm === "audit_log") {
+      handleShowAuditLogs();
+    }
+  }, [activeForm, handleShowAuditLogs]);
+
+  // ==========================================================================
+  // BASIC HANDLERS
   // ==========================================================================
 
   const handleSend = useCallback(async () => {
@@ -76,6 +312,76 @@ export default function ChatPage() {
   const handleCloseForm = useCallback(() => {
     setActiveForm(null);
   }, [setActiveForm]);
+
+  // ==========================================================================
+  // RENDER FORM
+  // ==========================================================================
+
+  const renderForm = () => {
+    switch (activeForm) {
+      case "pods_lite":
+        return (
+          <PodsLiteForm
+            onSubmit={handlePodsLiteSubmit}
+            onCancel={handleCloseForm}
+            prefill={
+              vendorState.companyName
+                ? { vendorName: vendorState.companyName }
+                : undefined
+            }
+          />
+        );
+
+      case "sso_config":
+        return (
+          <SsoConfigForm
+            onSubmit={handleSsoSubmit}
+            onCancel={handleCloseForm}
+          />
+        );
+
+      case "api_tester":
+        return <ApiTester onClose={handleCloseForm} />;
+
+      case "comm_test":
+        return (
+          <CommTestForm
+            onSubmit={handleCommSubmit}
+            onCancel={handleCloseForm}
+          />
+        );
+
+      case "credentials":
+        if (vendorState.credentials) {
+          return <CredentialsDisplay credentials={vendorState.credentials} />;
+        }
+        return (
+          <div className="text-center py-8 text-gray-500">
+            <p>No credentials available. Complete onboarding first.</p>
+          </div>
+        );
+
+      case "audit_log":
+        return <AuditLogViewer logs={auditLogs} />;
+
+      case "app_submit":
+        return (
+          <AppSubmitForm
+            onSubmit={handleAppSubmit}
+            onCancel={handleCloseForm}
+          />
+        );
+
+      default:
+        return (
+          <div className="text-center py-8 text-gray-500">
+            <p className="text-sm">
+              Form type <code className="bg-gray-100 px-1 rounded">{activeForm}</code> not implemented.
+            </p>
+          </div>
+        );
+    }
+  };
 
   // ==========================================================================
   // RENDER
@@ -158,7 +464,7 @@ export default function ChatPage() {
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-4 py-6">
           {/* Welcome message if no messages */}
-          {messages.length === 0 && (
+          {messages.length === 0 && !activeForm && (
             <div className="text-center py-12">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-secondary text-white mb-6 shadow-lg">
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,7 +476,7 @@ export default function ChatPage() {
               </h2>
               <p className="text-lg text-gray-500 mb-1">Vendor Integration Portal</p>
               <p className="text-gray-600 max-w-lg mx-auto mb-8">
-                I'm your AI integration assistant. I can help you onboard as a
+                I&apos;m your AI integration assistant. I can help you onboard as a
                 vendor, configure SSO, test APIs, and more - all with
                 privacy-protected tokenized data.
               </p>
@@ -206,22 +512,24 @@ export default function ChatPage() {
             {activeForm && (
               <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                  {/* Form Header */}
-                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                    <h3 className="font-medium text-gray-800">
-                      {getFormTitle(activeForm)}
-                    </h3>
-                    <button
-                      onClick={handleCloseForm}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
+                  {/* Form Header - only show for forms that need close button */}
+                  {activeForm !== "api_tester" && (
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+                      <h3 className="font-medium text-gray-800">
+                        {getFormTitle(activeForm)}
+                      </h3>
+                      <button
+                        onClick={handleCloseForm}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
 
-                  {/* Form Content Placeholder */}
+                  {/* Form Content */}
                   <div className="p-4">
-                    <FormPlaceholder formType={activeForm} />
+                    {renderForm()}
                   </div>
                 </div>
               </div>
@@ -306,7 +614,7 @@ export default function ChatPage() {
 }
 
 // =============================================================================
-// HELPER COMPONENTS
+// HELPER FUNCTIONS
 // =============================================================================
 
 function getFormTitle(formType: string): string {
@@ -317,25 +625,8 @@ function getFormTitle(formType: string): string {
     comm_test: "Communication Gateway Test",
     app_submit: "Freemium App Submission",
     credentials: "Sandbox Credentials",
-    audit_log: "Audit Log Viewer",
+    audit_log: "Audit Log",
     lti_config: "LTI 1.3 Configuration",
   };
   return titles[formType] ?? "Form";
-}
-
-function FormPlaceholder({ formType }: { formType: string }) {
-  // This is a placeholder - actual form components will be implemented separately
-  return (
-    <div className="text-center py-8 text-gray-500">
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
-        <Building2 className="w-6 h-6 text-gray-400" />
-      </div>
-      <p className="text-sm">
-        {getFormTitle(formType)} form will be rendered here.
-      </p>
-      <p className="text-xs text-gray-400 mt-1">
-        Form type: <code className="bg-gray-100 px-1 rounded">{formType}</code>
-      </p>
-    </div>
-  );
 }

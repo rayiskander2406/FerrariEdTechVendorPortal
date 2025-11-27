@@ -113,11 +113,12 @@ export function SsoConfigForm({ provider: initialProvider, onSubmit, onCancel }:
   // ==========================================================================
 
   const handleProviderChange = useCallback((provider: SsoProvider) => {
+    const providerScopes = SCOPES_BY_PROVIDER[provider];
     setFormData((prev) => ({
       ...prev,
       provider,
       // Reset scopes to first available scope for new provider
-      scopes: [SCOPES_BY_PROVIDER[provider][0].value],
+      scopes: providerScopes && providerScopes[0] ? [providerScopes[0].value] : [],
     }));
     setErrors((prev) => ({ ...prev, provider: undefined }));
   }, []);

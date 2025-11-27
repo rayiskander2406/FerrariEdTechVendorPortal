@@ -11,6 +11,14 @@ import { getSystemPrompt } from "@/lib/ai/system-prompt";
 import { TOOL_DEFINITIONS } from "@/lib/ai/tools";
 import { executeToolCall, type ToolResult } from "@/lib/ai/handlers";
 import { type VendorContext } from "@/lib/types";
+import {
+  AppError,
+  ValidationError,
+  AIServiceError,
+  ErrorCodes,
+  logError,
+  type ErrorCode,
+} from "@/lib/errors";
 
 // Use edge runtime for streaming
 export const runtime = "edge";
@@ -29,15 +37,101 @@ interface ChatRequest {
   vendorContext?: VendorContext;
 }
 
+interface ErrorResponse {
+  error: string;
+  code?: string;
+  details?: Record<string, unknown>;
+}
+
+// =============================================================================
+// HELPER: Create Error Response
+// =============================================================================
+
+function createErrorResponse(error: unknown): Response {
+  // Log the error
+  logError(error, { action: "chat_api" });
+
+  // Handle AppError types
+  if (error instanceof AppError) {
+    const response: ErrorResponse = {
+      error: error.toUserMessage(),
+      code: error.code,
+    };
+    if (error.details) {
+      response.details = error.details;
+    }
+    return Response.json(response, { status: error.statusCode });
+  }
+
+  // Handle Anthropic API errors
+  if (error instanceof Anthropic.APIError) {
+    const statusCode = error.status || 500;
+    let userMessage = "AI service error. Please try again.";
+    let code: ErrorCode = ErrorCodes.AI_SERVICE_ERROR;
+
+    if (statusCode === 401) {
+      userMessage = "AI service authentication failed. Please contact support.";
+      code = ErrorCodes.UNAUTHORIZED;
+    } else if (statusCode === 429) {
+      userMessage = "AI service is busy. Please wait a moment and try again.";
+      code = ErrorCodes.RATE_LIMITED;
+    } else if (statusCode === 500 || statusCode === 502 || statusCode === 503) {
+      userMessage = "AI service is temporarily unavailable. Please try again later.";
+    }
+
+    console.error("[Anthropic API Error]", {
+      status: statusCode,
+      message: error.message,
+      headers: error.headers,
+    });
+
+    return Response.json(
+      { error: userMessage, code },
+      { status: statusCode >= 500 ? 502 : statusCode }
+    );
+  }
+
+  // Handle generic errors
+  if (error instanceof Error) {
+    console.error("[Chat API Error]", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    });
+
+    // Don't expose internal error messages
+    return Response.json(
+      {
+        error: "An unexpected error occurred. Please try again.",
+        code: ErrorCodes.INTERNAL_ERROR,
+      },
+      { status: 500 }
+    );
+  }
+
+  // Unknown error type
+  console.error("[Unknown Error]", error);
+  return Response.json(
+    {
+      error: "An unexpected error occurred. Please try again.",
+      code: ErrorCodes.INTERNAL_ERROR,
+    },
+    { status: 500 }
+  );
+}
+
 // =============================================================================
 // GET - Health Check
 // =============================================================================
 
 export async function GET() {
+  const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+
   return Response.json({
-    status: "ok",
-    service: "lausd-vendor-chat",
+    status: hasApiKey ? "ok" : "degraded",
+    service: "schoolday-vendor-chat",
     timestamp: new Date().toISOString(),
+    apiKeyConfigured: hasApiKey,
   });
 }
 
@@ -48,23 +142,51 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
-    const body = (await request.json()) as ChatRequest;
+    let body: ChatRequest;
+    try {
+      body = (await request.json()) as ChatRequest;
+    } catch {
+      throw new ValidationError("Invalid JSON in request body");
+    }
+
     const { messages, vendorContext } = body;
 
     // Validate messages
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return Response.json(
-        { error: "Messages array is required and must not be empty" },
-        { status: 400 }
-      );
+    if (!messages) {
+      throw new ValidationError("Messages field is required", "messages");
+    }
+
+    if (!Array.isArray(messages)) {
+      throw new ValidationError("Messages must be an array", "messages");
+    }
+
+    if (messages.length === 0) {
+      throw new ValidationError("Messages array must not be empty", "messages");
+    }
+
+    // Validate each message
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      if (!msg || !msg.role || !["user", "assistant"].includes(msg.role)) {
+        throw new ValidationError(
+          `Invalid role: must be 'user' or 'assistant'`,
+          `messages[${i}].role`
+        );
+      }
+      if (typeof msg.content !== "string") {
+        throw new ValidationError(
+          "Content must be a string",
+          `messages[${i}].content`
+        );
+      }
     }
 
     // Check for API key
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      return Response.json(
-        { error: "ANTHROPIC_API_KEY environment variable is not set" },
-        { status: 500 }
+      throw new AIServiceError(
+        "AI service not configured",
+        { statusCode: 503 }
       );
     }
 
@@ -96,11 +218,39 @@ export async function POST(request: NextRequest) {
             encoder
           );
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : "Unknown error";
+          // Handle streaming errors
+          let errorMessage = "An error occurred while processing your request.";
+          let errorCode: ErrorCode = ErrorCodes.INTERNAL_ERROR;
+
+          if (error instanceof Anthropic.APIError) {
+            if (error.status === 429) {
+              errorMessage = "AI service is busy. Please wait a moment and try again.";
+              errorCode = ErrorCodes.RATE_LIMITED;
+            } else if (error.status === 401) {
+              errorMessage = "AI service authentication error.";
+              errorCode = ErrorCodes.UNAUTHORIZED;
+            } else {
+              errorMessage = "AI service error. Please try again.";
+              errorCode = ErrorCodes.AI_SERVICE_ERROR;
+            }
+            console.error("[Streaming Anthropic Error]", {
+              status: error.status,
+              message: error.message,
+            });
+          } else if (error instanceof Error) {
+            console.error("[Streaming Error]", {
+              name: error.name,
+              message: error.message,
+            });
+          }
+
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", error: errorMessage })}\n\n`
+              `data: ${JSON.stringify({
+                type: "error",
+                error: errorMessage,
+                code: errorCode,
+              })}\n\n`
             )
           );
         } finally {
@@ -119,10 +269,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Chat API error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unexpected error occurred";
-    return Response.json({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(error);
   }
 }
 
@@ -172,16 +319,12 @@ async function processWithToolCalls(
     name: string;
     input: Record<string, unknown>;
   } | null = null;
-  let accumulatedText = "";
   let stopReason: string | null = null;
 
   // Process stream events
   for await (const event of stream) {
     if (event.type === "content_block_start") {
-      if (event.content_block.type === "text") {
-        // Starting a text block
-        accumulatedText = "";
-      } else if (event.content_block.type === "tool_use") {
+      if (event.content_block.type === "tool_use") {
         // Starting a tool use block
         currentToolUse = {
           id: event.content_block.id,
@@ -202,7 +345,6 @@ async function processWithToolCalls(
     } else if (event.type === "content_block_delta") {
       if (event.delta.type === "text_delta") {
         // Stream text content
-        accumulatedText += event.delta.text;
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
@@ -259,36 +401,64 @@ async function processWithToolCalls(
           )
         );
 
-        // Execute the tool
-        const result = await executeToolCall(
-          toolUse.name,
-          toolUse.input as Record<string, unknown>
-        );
+        try {
+          // Execute the tool
+          const result = await executeToolCall(
+            toolUse.name,
+            toolUse.input as Record<string, unknown>
+          );
 
-        // Notify client of tool result
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "tool_result",
-              tool: toolUse.name,
-              id: toolUse.id,
-              result: {
-                success: result.success,
-                showForm: result.showForm,
-                message: result.message,
-                // Include data summary but not full data to keep stream light
-                hasData: !!result.data,
-              },
-            })}\n\n`
-          )
-        );
+          // Notify client of tool result
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "tool_result",
+                tool: toolUse.name,
+                id: toolUse.id,
+                result: {
+                  success: result.success,
+                  showForm: result.showForm,
+                  message: result.message,
+                  hasData: !!result.data,
+                },
+              })}\n\n`
+            )
+          );
 
-        // Format result for Claude
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: formatToolResultForClaude(result),
-        });
+          // Format result for Claude
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolUse.id,
+            content: formatToolResultForClaude(result),
+          });
+        } catch (toolError) {
+          console.error(`[Tool Error] ${toolUse.name}:`, toolError);
+
+          // Notify client of tool error
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "tool_result",
+                tool: toolUse.name,
+                id: toolUse.id,
+                result: {
+                  success: false,
+                  error: "Tool execution failed",
+                },
+              })}\n\n`
+            )
+          );
+
+          // Format error result for Claude
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolUse.id,
+            content: JSON.stringify({
+              success: false,
+              error: toolError instanceof Error ? toolError.message : "Tool execution failed",
+            }),
+          });
+        }
       }
 
       // Build new messages array with assistant response and tool results

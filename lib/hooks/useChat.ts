@@ -12,6 +12,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { type VendorContext, type AccessTier, type SandboxCredentials, type IntegrationConfig } from "@/lib/types";
+import { NetworkError, getUserErrorMessage } from "@/lib/errors";
 
 // =============================================================================
 // TYPES
@@ -368,12 +369,28 @@ export function useChat(): UseChatReturn {
           setActiveFormState(formTrigger);
         }
       } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.name === "AbortError"
-              ? "Request timed out. Please try again."
-              : err.message
-            : "An unexpected error occurred";
+        // Handle different error types with user-friendly messages
+        let errorMessage: string;
+
+        if (err instanceof Error) {
+          if (err.name === "AbortError") {
+            // Timeout or manual abort
+            errorMessage = "Request timed out. Please try again.";
+          } else if (
+            err.message.includes("Failed to fetch") ||
+            err.message.includes("NetworkError") ||
+            err.message.includes("fetch")
+          ) {
+            // Network connectivity issues
+            const networkError = NetworkError.fromFetchError(err);
+            errorMessage = networkError.toUserMessage();
+          } else {
+            // Use the error utilities for consistent messaging
+            errorMessage = getUserErrorMessage(err);
+          }
+        } else {
+          errorMessage = "An unexpected error occurred. Please try again.";
+        }
 
         setError(errorMessage);
 

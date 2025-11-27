@@ -220,7 +220,7 @@ export function AppSubmitForm({ onSubmit, onCancel }: AppSubmitFormProps) {
             <div>
               <h3 className="font-semibold">Freemium App Submission</h3>
               <p className="text-sm text-white/80">
-                Submit your app for LAUSD's freemium catalog
+                Submit your app for LAUSD&apos;s freemium catalog
               </p>
             </div>
           </div>

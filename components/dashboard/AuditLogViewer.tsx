@@ -5,7 +5,6 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
-  Download,
   FileJson,
   FileSpreadsheet,
   Shield,
@@ -71,8 +70,8 @@ const EVENT_TYPES: Record<string, { color: string; bgColor: string; icon: typeof
   default: { color: "text-gray-400", bgColor: "bg-gray-500/20", icon: Info },
 };
 
-function getEventConfig(action: string) {
-  return EVENT_TYPES[action] || EVENT_TYPES.default;
+function getEventConfig(action: string): { color: string; bgColor: string; icon: typeof Shield } {
+  return EVENT_TYPES[action] ?? EVENT_TYPES.default!;
 }
 
 // =============================================================================

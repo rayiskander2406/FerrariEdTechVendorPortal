@@ -608,7 +608,7 @@ export function PodsLiteForm({ onSubmit, onCancel, prefill }: PodsLiteFormProps)
                 COPPA Compliance *
               </span>
               <p className="text-xs text-gray-500">
-                I certify that our application complies with the Children's Online
+                I certify that our application complies with the Children&apos;s Online
                 Privacy Protection Act (COPPA).
               </p>
             </div>
@@ -706,7 +706,7 @@ export function PodsLiteForm({ onSubmit, onCancel, prefill }: PodsLiteFormProps)
             <h4 className="font-medium text-success-800">TOKEN_ONLY Access Tier</h4>
             <p className="text-sm text-success-700 mt-1">
               Based on your selections, your application qualifies for TOKEN_ONLY access,
-              which means you'll receive tokenized identifiers with zero actual PII.
+              which means you&apos;ll receive tokenized identifiers with zero actual PII.
               This tier is eligible for <strong>instant approval</strong>.
             </p>
           </div>
