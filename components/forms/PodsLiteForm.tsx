@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, type FormEvent } from "react";
+import { useState, useCallback, useEffect, type FormEvent } from "react";
 import { z } from "zod";
 import {
   Building2,
@@ -123,6 +123,12 @@ export function PodsLiteForm({ onSubmit, onCancel, prefill }: PodsLiteFormProps)
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Prevent hydration flash
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // ==========================================================================
   // HANDLERS
@@ -228,6 +234,31 @@ export function PodsLiteForm({ onSubmit, onCancel, prefill }: PodsLiteFormProps)
   // ==========================================================================
   // RENDER
   // ==========================================================================
+
+  // Show loading skeleton until mounted
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg h-24" />
+        <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-40" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="h-10 bg-gray-200 rounded" />
+            <div className="h-10 bg-gray-200 rounded" />
+            <div className="h-10 bg-gray-200 rounded" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-48" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -713,9 +744,9 @@ export function PodsLiteForm({ onSubmit, onCancel, prefill }: PodsLiteFormProps)
         </div>
       </div>
 
-      {/* Validation Summary - shown when form is incomplete */}
-      {!isFormValid && (
-        <div className="bg-warning-50 border border-warning-200 rounded-lg p-3">
+      {/* Validation Summary - shown when form is incomplete (only after mount to prevent flash) */}
+      {isMounted && !isFormValid && (
+        <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 transition-opacity duration-200">
           <p className="text-sm text-warning-700 font-medium mb-2">Please complete all required fields:</p>
           <ul className="text-xs text-warning-600 space-y-1 list-disc list-inside">
             {formData.vendorName.length < 2 && <li>Company name (min 2 characters)</li>}
