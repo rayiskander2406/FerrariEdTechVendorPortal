@@ -457,10 +457,27 @@ export function generateAllData(): SyntheticData {
 }
 
 // =============================================================================
-// PRE-GENERATED DATA
+// LAZY-LOADED DATA
 // =============================================================================
 
-export const SYNTHETIC_DATA: SyntheticData = generateAllData();
+let _syntheticData: SyntheticData | null = null;
+
+/**
+ * Get synthetic data (lazy-loaded to avoid edge runtime initialization issues)
+ */
+export function getSyntheticData(): SyntheticData {
+  if (!_syntheticData) {
+    _syntheticData = generateAllData();
+  }
+  return _syntheticData;
+}
+
+// For backwards compatibility - use getter
+export const SYNTHETIC_DATA: SyntheticData = new Proxy({} as SyntheticData, {
+  get(_target, prop: keyof SyntheticData) {
+    return getSyntheticData()[prop];
+  },
+});
 
 // =============================================================================
 // ONEROSTER API RESPONSE GENERATOR
@@ -484,6 +501,7 @@ export function getOneRosterResponse(
   offset: number = 0
 ): OneRosterResponse {
   const dateModified = "2024-11-15T00:00:00Z";
+  const data = getSyntheticData();
 
   switch (endpoint) {
     case "/users": {
@@ -491,7 +509,7 @@ export function getOneRosterResponse(
 
       // Add students
       if (!filters?.role || filters.role === "student") {
-        let filteredStudents = SYNTHETIC_DATA.students;
+        let filteredStudents = data.students;
 
         if (filters?.schoolId) {
           filteredStudents = filteredStudents.filter(
@@ -521,7 +539,7 @@ export function getOneRosterResponse(
 
       // Add teachers
       if (!filters?.role || filters.role === "teacher") {
-        let filteredTeachers = SYNTHETIC_DATA.teachers;
+        let filteredTeachers = data.teachers;
 
         if (filters?.schoolId) {
           filteredTeachers = filteredTeachers.filter(
@@ -557,7 +575,7 @@ export function getOneRosterResponse(
     }
 
     case "/orgs": {
-      const orgs: OneRosterOrg[] = SYNTHETIC_DATA.schools.map((s) => ({
+      const orgs: OneRosterOrg[] = data.schools.map((s) => ({
         sourcedId: s.token,
         status: "active" as const,
         dateLastModified: dateModified,
@@ -587,7 +605,7 @@ export function getOneRosterResponse(
     }
 
     case "/classes": {
-      let filteredClasses = SYNTHETIC_DATA.classes;
+      let filteredClasses = data.classes;
 
       if (filters?.schoolId) {
         filteredClasses = filteredClasses.filter(
@@ -626,7 +644,7 @@ export function getOneRosterResponse(
     }
 
     case "/enrollments": {
-      let filteredEnrollments = SYNTHETIC_DATA.enrollments;
+      let filteredEnrollments = data.enrollments;
 
       if (filters?.classId) {
         filteredEnrollments = filteredEnrollments.filter(
@@ -643,7 +661,7 @@ export function getOneRosterResponse(
         .slice(offset, offset + limit)
         .map((e) => {
           // Find the class to get the school
-          const cls = SYNTHETIC_DATA.classes.find(
+          const cls = data.classes.find(
             (c) => c.token === e.classToken
           );
           return {
@@ -759,48 +777,50 @@ export function getMockPodsDatabase(): PodsApplication[] {
  * Get a specific student by token
  */
 export function getStudentByToken(token: string): SyntheticStudent | undefined {
-  return SYNTHETIC_DATA.students.find((s) => s.token === token);
+  return getSyntheticData().students.find((s) => s.token === token);
 }
 
 /**
  * Get a specific teacher by token
  */
 export function getTeacherByToken(token: string): SyntheticTeacher | undefined {
-  return SYNTHETIC_DATA.teachers.find((t) => t.token === token);
+  return getSyntheticData().teachers.find((t) => t.token === token);
 }
 
 /**
  * Get a specific school by token
  */
 export function getSchoolByToken(token: string): SyntheticSchool | undefined {
-  return SYNTHETIC_DATA.schools.find((s) => s.token === token);
+  return getSyntheticData().schools.find((s) => s.token === token);
 }
 
 /**
  * Get classes for a teacher
  */
 export function getClassesByTeacher(teacherToken: string): SyntheticClass[] {
-  return SYNTHETIC_DATA.classes.filter((c) => c.teacherToken === teacherToken);
+  return getSyntheticData().classes.filter((c) => c.teacherToken === teacherToken);
 }
 
 /**
  * Get students in a class
  */
 export function getStudentsInClass(classToken: string): SyntheticStudent[] {
-  const studentTokens = SYNTHETIC_DATA.enrollments
+  const data = getSyntheticData();
+  const studentTokens = data.enrollments
     .filter((e) => e.classToken === classToken)
     .map((e) => e.studentToken);
 
-  return SYNTHETIC_DATA.students.filter((s) => studentTokens.includes(s.token));
+  return data.students.filter((s) => studentTokens.includes(s.token));
 }
 
 /**
  * Get classes for a student
  */
 export function getClassesForStudent(studentToken: string): SyntheticClass[] {
-  const classTokens = SYNTHETIC_DATA.enrollments
+  const data = getSyntheticData();
+  const classTokens = data.enrollments
     .filter((e) => e.studentToken === studentToken)
     .map((e) => e.classToken);
 
-  return SYNTHETIC_DATA.classes.filter((c) => classTokens.includes(c.token));
+  return data.classes.filter((c) => classTokens.includes(c.token));
 }
