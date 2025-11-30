@@ -3,9 +3,18 @@
  *
  * These tools follow the Anthropic tool schema format and enable
  * the AI to perform structured actions within the portal.
+ *
+ * NOTE: Tool names are imported from @/lib/config/ai-tools (CONFIG-03)
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
+import { AI_TOOL_SSO_PROVIDERS } from "@/lib/config/sso";
+import {
+  AI_TOOLS,
+  ALL_TOOL_IDS,
+  type ToolId,
+  type ToolKey,
+} from "@/lib/config/ai-tools";
 
 // =============================================================================
 // TOOL DEFINITIONS
@@ -43,10 +52,10 @@ Returns the PoDS application details including status, access tier, and expirati
   // -------------------------------------------------------------------------
   {
     name: "submit_pods_lite",
-    description: `Trigger the PoDS-Lite application form for TOKEN_ONLY data access.
+    description: `Trigger the PoDS-Lite application form for Privacy-Safe data access.
 
 PoDS-Lite is a streamlined 13-question privacy application that:
-- Grants TOKEN_ONLY access (zero actual PII)
+- Grants Privacy-Safe access (zero actual PII)
 - Can be auto-approved in minutes
 - Covers 80% of typical EdTech integration needs
 
@@ -133,7 +142,7 @@ Can either trigger the configuration form or update settings directly if credent
       properties: {
         provider: {
           type: "string",
-          enum: ["CLEVER", "CLASSLINK", "GOOGLE"],
+          enum: [...AI_TOOL_SSO_PROVIDERS],
           description: "The SSO provider to configure",
         },
         trigger_form: {
@@ -514,8 +523,8 @@ Use this tool when:
     description: `Initiate a request to upgrade a vendor's data access tier.
 
 Upgrade Paths:
-- TOKEN_ONLY → SELECTIVE: Requires justification for limited PII access
-- TOKEN_ONLY → FULL_ACCESS: Requires strong justification and DPA
+- PRIVACY_SAFE → SELECTIVE: Requires justification for limited PII access
+- PRIVACY_SAFE → FULL_ACCESS: Requires strong justification and DPA
 - SELECTIVE → FULL_ACCESS: Requires DPA and enhanced security review
 
 Process:
@@ -525,10 +534,10 @@ Process:
 4. Vendor notified of decision
 
 Use this tool when:
-- Vendor has legitimate need for more data than TOKEN_ONLY provides
+- Vendor has legitimate need for more data than Privacy-Safe provides
 - Vendor's use case genuinely requires actual PII
 
-Always encourage TOKEN_ONLY first - only use this if the vendor has a clear, specific need for actual student PII.`,
+Always encourage Privacy-Safe first - only use this if the vendor has a clear, specific need for actual student PII.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -538,7 +547,7 @@ Always encourage TOKEN_ONLY first - only use this if the vendor has a clear, spe
         },
         current_tier: {
           type: "string",
-          enum: ["TOKEN_ONLY", "SELECTIVE"],
+          enum: ["PRIVACY_SAFE", "SELECTIVE"],
           description: "The vendor's current access tier",
         },
         target_tier: {
@@ -657,6 +666,8 @@ export interface SubmitPodsLiteInput {
 
 export interface ProvisionSandboxInput {
   vendor_id: string;
+  /** Optional array of OneRoster resources the vendor requested (e.g., ['users', 'classes', 'academicSessions']) */
+  requested_resources?: string[];
 }
 
 export interface ConfigureSsoInput {
@@ -724,7 +735,7 @@ export interface CheckStatusInput {
 
 export interface RequestUpgradeInput {
   vendor_id: string;
-  current_tier?: "TOKEN_ONLY" | "SELECTIVE";
+  current_tier?: "PRIVACY_SAFE" | "SELECTIVE";
   target_tier: "SELECTIVE" | "FULL_ACCESS";
   justification: string;
   data_elements_needed?: string[];

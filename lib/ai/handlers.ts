@@ -3,6 +3,8 @@
  *
  * Each handler implements the logic for a specific tool, returning
  * structured results that the AI can interpret and present to users.
+ *
+ * NOTE: Tool names are imported from @/lib/config/ai-tools (CONFIG-03)
  */
 
 import {
@@ -13,9 +15,14 @@ import {
   getVendor,
   getSandbox,
   createSandbox,
+  createVendor,
   getAuditLogs,
   logAuditEvent,
 } from "@/lib/db";
+import { resourcesToEndpoints } from "@/lib/config/oneroster";
+import { FORM_TYPES } from "@/lib/config/forms";
+import { getSsoProviderInfo, getProviderDomain } from "@/lib/config/sso";
+import { AI_TOOLS, type ToolId } from "@/lib/config/ai-tools";
 import type {
   LookupPodsInput,
   ProvisionSandboxInput,
@@ -38,6 +45,7 @@ export interface ToolResult {
   error?: string;
   showForm?: string;
   message?: string;
+  hasData?: boolean;
 }
 
 // =============================================================================
@@ -90,16 +98,87 @@ export async function handleLookupPods(
 }
 
 /**
- * 2. submit_pods_lite - Trigger PoDS-Lite form
+ * 2. submit_pods_lite - Trigger PoDS-Lite form or process submission
  */
 export async function handleSubmitPodsLite(input: {
-  trigger_form: boolean;
+  trigger_form?: boolean;
   prefill_vendor_name?: string;
   prefill_email?: string;
+  // Full submission fields
+  vendorName?: string;
+  contactEmail?: string;
+  contactName?: string;
+  appDescription?: string;
+  website?: string;
+  dataElements?: string[];
+  dataPurpose?: string;
+  dataRetention?: string;
+  integrationMethod?: string;
+  thirdPartySharing?: boolean;
+  securityMeasures?: string;
+  encryption?: boolean;
+  breachNotification?: string;
+  coppaCompliant?: boolean;
+  termsAccepted?: boolean;
 }): Promise<ToolResult> {
+  // If full submission data provided, process the application
+  if (input.vendorName && input.contactEmail && input.termsAccepted) {
+    // Map data elements to typed values
+    type DataElementType = "STUDENT_ID" | "FIRST_NAME" | "LAST_NAME" | "EMAIL" | "GRADE_LEVEL" | "SCHOOL_ID" | "CLASS_ROSTER" | "TEACHER_ID" | "PHONE" | "ADDRESS" | "DEMOGRAPHICS" | "SPECIAL_ED" | "ATTENDANCE" | "GRADES";
+    const defaultDataElements: DataElementType[] = ["STUDENT_ID", "FIRST_NAME", "GRADE_LEVEL"];
+    const dataElements: DataElementType[] = (input.dataElements || defaultDataElements) as DataElementType[];
+
+    // Map integration method
+    type IntegrationMethodType = "ONEROSTER_API" | "SFTP" | "LTI_1_3" | "SSO_SAML" | "SSO_OIDC" | "MANUAL_UPLOAD";
+    const integrationMethod: IntegrationMethodType =
+      input.integrationMethod === "API" ? "ONEROSTER_API" :
+      (input.integrationMethod as IntegrationMethodType) || "ONEROSTER_API";
+
+    // Create the vendor in the database
+    const vendor = await createVendor({
+      podsLiteInput: {
+        vendorName: input.vendorName,
+        contactEmail: input.contactEmail,
+        contactName: input.contactName || "Unknown",
+        contactPhone: "",
+        applicationName: input.vendorName,
+        applicationDescription: input.appDescription || "",
+        dataElementsRequested: dataElements,
+        dataPurpose: input.dataPurpose || "Educational application",
+        dataRetentionDays: 365,
+        integrationMethod: integrationMethod,
+        thirdPartySharing: input.thirdPartySharing || false,
+        thirdPartyDetails: undefined,
+        hasSOC2: true,
+        hasFERPACertification: true,
+        encryptsDataAtRest: input.encryption || true,
+        encryptsDataInTransit: true,
+        breachNotificationHours: 24,
+        coppaCompliant: input.coppaCompliant || true,
+        acceptsTerms: input.termsAccepted,
+        acceptsDataDeletion: true,
+      },
+      accessTier: "PRIVACY_SAFE",
+    });
+
+    return {
+      success: true,
+      data: {
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        accessTier: vendor.accessTier,
+        status: vendor.podsStatus,
+        approvedAt: new Date().toISOString(),
+        message: "Privacy-Safe access auto-approved! You can now provision sandbox credentials.",
+      },
+      message: `PoDS-Lite application approved! Vendor ID: ${vendor.id}. Privacy-Safe tier grants instant access with tokenized data only.`,
+    };
+  }
+
+  // Otherwise, trigger the form
   return {
     success: true,
-    showForm: "pods_lite",
+    showForm: FORM_TYPES.PODS_LITE.id,
     data: {
       prefill: {
         vendorName: input.prefill_vendor_name,
@@ -107,17 +186,19 @@ export async function handleSubmitPodsLite(input: {
       },
     },
     message:
-      "Please complete the PoDS-Lite application below. This streamlined 13-question form will grant you TOKEN_ONLY access with instant approval.",
+      "Please complete the PoDS-Lite application below. This streamlined 13-question form will grant you Privacy-Safe access with instant approval.",
   };
 }
 
 /**
  * 3. provision_sandbox - Generate API credentials
+ *
+ * @see lib/config/oneroster.ts for endpoint configuration (single source of truth)
  */
 export async function handleProvisionSandbox(
-  input: ProvisionSandboxInput
+  input: ProvisionSandboxInput & { requested_resources?: string[] }
 ): Promise<ToolResult> {
-  const { vendor_id } = input;
+  const { vendor_id, requested_resources } = input;
 
   try {
     // Check if vendor exists
@@ -134,7 +215,7 @@ export async function handleProvisionSandbox(
     if (existingSandbox && existingSandbox.status === "ACTIVE") {
       return {
         success: true,
-        showForm: "credentials",
+        showForm: FORM_TYPES.CREDENTIALS.id,
         data: {
           existing: true,
           apiKey: existingSandbox.apiKey,
@@ -149,12 +230,15 @@ export async function handleProvisionSandbox(
       };
     }
 
-    // Create new sandbox
-    const sandbox = await createSandbox(vendor_id);
+    // Map requested resources to endpoint paths (uses centralized config)
+    const requestedEndpoints = resourcesToEndpoints(requested_resources);
+
+    // Create new sandbox with requested endpoints
+    const sandbox = await createSandbox(vendor_id, requestedEndpoints);
 
     return {
       success: true,
-      showForm: "credentials",
+      showForm: FORM_TYPES.CREDENTIALS.id,
       data: {
         new: true,
         apiKey: sandbox.apiKey,
@@ -220,7 +304,7 @@ export async function handleConfigureSso(
   // Trigger the configuration form
   return {
     success: true,
-    showForm: "sso_config",
+    showForm: FORM_TYPES.SSO_CONFIG.id,
     data: {
       provider,
       providerInfo: getSsoProviderInfo(provider),
@@ -265,6 +349,7 @@ export async function handleTestOneroster(
 
     return {
       success: true,
+      hasData: true,
       data: {
         endpoint,
         filters: filters ?? {},
@@ -335,7 +420,7 @@ export async function handleConfigureLti(input: {
 
   return {
     success: true,
-    showForm: "lti_config",
+    showForm: FORM_TYPES.LTI_CONFIG.id,
     data: {
       platformInfo: {
         name: "Schoology (LAUSD)",
@@ -357,7 +442,8 @@ export async function handleConfigureLti(input: {
 }
 
 /**
- * 7. send_test_message - Test communication gateway
+ * 7. send_test_message - Test communication gateway (CPaaS)
+ * Supports parent/guardian tokens for privacy-safe communication
  */
 export async function handleSendTestMessage(
   input: SendTestMessageInput
@@ -365,21 +451,23 @@ export async function handleSendTestMessage(
   const { channel, recipient_token, subject, body } = input;
 
   // Validate recipient token format
-  if (
-    channel === "EMAIL" &&
-    !recipient_token.match(/^TKN_STU_[a-z0-9]+@relay\.schoolday\.lausd\.net$/)
-  ) {
+  // Accept parent tokens (TKN_PAR_xxx), student relay emails, or phone tokens
+  const isParentToken = /^TKN_PAR_[A-Z0-9]+$/.test(recipient_token);
+  const isStudentRelayEmail = /^TKN_STU_[a-z0-9]+@relay\.schoolday\.lausd\.net$/.test(recipient_token);
+  const isSmsToken = /^TKN_555_XXX_\d{4}$/.test(recipient_token);
+
+  if (channel === "EMAIL" && !isParentToken && !isStudentRelayEmail) {
     return {
       success: false,
       error:
-        "Invalid email token format. Expected format: TKN_STU_xxx@relay.schoolday.lausd.net",
+        "Invalid email token format. Expected: TKN_PAR_xxx (parent) or TKN_STU_xxx@relay.schoolday.lausd.net (student relay)",
     };
   }
 
-  if (channel === "SMS" && !recipient_token.match(/^TKN_555_XXX_\d{4}$/)) {
+  if (channel === "SMS" && !isParentToken && !isSmsToken) {
     return {
       success: false,
-      error: "Invalid SMS token format. Expected format: TKN_555_XXX_1234",
+      error: "Invalid SMS token format. Expected: TKN_PAR_xxx (parent) or TKN_555_XXX_1234",
     };
   }
 
@@ -446,7 +534,7 @@ export async function handleSubmitApp(input: {
 }): Promise<ToolResult> {
   return {
     success: true,
-    showForm: "app_submit",
+    showForm: FORM_TYPES.APP_SUBMIT.id,
     data: {
       prefill: {
         appName: input.app_name,
@@ -486,7 +574,7 @@ export async function handleGetAuditLogs(
     if (logs.length === 0) {
       return {
         success: true,
-        showForm: "audit_log",
+        showForm: FORM_TYPES.AUDIT_LOG.id,
         data: {
           logs: [],
           summary: {
@@ -517,7 +605,7 @@ export async function handleGetAuditLogs(
 
     return {
       success: true,
-      showForm: "audit_log",
+      showForm: FORM_TYPES.AUDIT_LOG.id,
       data: {
         logs: formattedLogs,
         summary: {
@@ -580,7 +668,7 @@ export async function handleGetCredentials(
 
     return {
       success: true,
-      showForm: "credentials",
+      showForm: FORM_TYPES.CREDENTIALS.id,
       data: {
         apiKey: sandbox.apiKey,
         apiSecret: show_secret ? sandbox.apiSecret : "••••••••••••••••",
@@ -784,7 +872,7 @@ export async function handleRequestUpgrade(
         `Your upgrade request ${requestId} has been submitted`,
         "LAUSD Privacy Office will review within 5 business days",
         "You may be contacted for additional information",
-        `Continue using TOKEN_ONLY access in the meantime`,
+        `Continue using Privacy-Safe access in the meantime`,
       ],
     },
     message: `Upgrade request submitted successfully. Request ID: ${requestId}. The LAUSD Privacy Office will review your request and contact you within 5 business days.`,
@@ -895,7 +983,7 @@ export async function executeToolCall(
 function getPodsStatusDescription(status: string): string {
   const descriptions: Record<string, string> = {
     NOT_STARTED:
-      "Application has not been started. Complete PoDS-Lite for quick TOKEN_ONLY approval.",
+      "Application has not been started. Complete PoDS-Lite for quick Privacy-Safe approval.",
     IN_PROGRESS:
       "Application is in progress. Complete all required fields to submit.",
     PENDING_REVIEW:
@@ -912,7 +1000,7 @@ function getPodsStatusDescription(status: string): string {
 
 function getAccessTierDescription(tier: string): string {
   const descriptions: Record<string, string> = {
-    TOKEN_ONLY:
+    PRIVACY_SAFE:
       "Zero actual PII. Receive tokenized identifiers, first names, and grade levels only. Instant approval available.",
     SELECTIVE:
       "Limited PII access (e.g., first name + email). Requires full PoDS review.",
@@ -922,41 +1010,7 @@ function getAccessTierDescription(tier: string): string {
   return descriptions[tier] ?? tier;
 }
 
-function getSsoProviderInfo(provider: string): Record<string, string> {
-  const info: Record<string, Record<string, string>> = {
-    CLEVER: {
-      name: "Clever",
-      website: "https://clever.com",
-      devPortal: "https://dev.clever.com",
-      docUrl: "https://dev.clever.com/docs",
-      typicalUse: "K-8 applications, instant login",
-    },
-    CLASSLINK: {
-      name: "ClassLink",
-      website: "https://classlink.com",
-      devPortal: "https://developer.classlink.com",
-      docUrl: "https://developer.classlink.com/docs",
-      typicalUse: "6-12 applications, LaunchPad integration",
-    },
-    GOOGLE: {
-      name: "Google Workspace",
-      website: "https://workspace.google.com",
-      devPortal: "https://console.cloud.google.com",
-      docUrl: "https://developers.google.com/identity",
-      typicalUse: "Universal SSO, all grade levels",
-    },
-  };
-  return info[provider] ?? { name: provider };
-}
-
-function getProviderDomain(provider: string): string {
-  const domains: Record<string, string> = {
-    CLEVER: "clever.com",
-    CLASSLINK: "classlink.com",
-    GOOGLE: "accounts.google.com",
-  };
-  return domains[provider] ?? provider.toLowerCase();
-}
+// NOTE: getSsoProviderInfo and getProviderDomain are now imported from @/lib/config/sso
 
 interface IntegrationStatus {
   pods: { status: string; accessTier?: string };
@@ -978,7 +1032,7 @@ function determineNextAction(status: IntegrationStatus): {
     return {
       action: "complete_pods_lite",
       description:
-        "Complete PoDS-Lite application to get TOKEN_ONLY access approved instantly.",
+        "Complete PoDS-Lite application to get Privacy-Safe access approved instantly.",
     };
   }
 
@@ -986,7 +1040,7 @@ function determineNextAction(status: IntegrationStatus): {
     return {
       action: "wait_for_review",
       description:
-        "Your PoDS application is under review. Typical timeline is 2-4 weeks for non-TOKEN_ONLY tiers.",
+        "Your PoDS application is under review. Typical timeline is 2-4 weeks for non-Privacy-Safe tiers.",
     };
   }
 
@@ -994,7 +1048,7 @@ function determineNextAction(status: IntegrationStatus): {
     return {
       action: "reapply",
       description:
-        "Submit a new PoDS application. Consider TOKEN_ONLY tier for faster approval.",
+        "Submit a new PoDS application. Consider Privacy-Safe tier for faster approval.",
     };
   }
 
