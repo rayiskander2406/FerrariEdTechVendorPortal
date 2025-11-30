@@ -520,5 +520,13 @@ function formatToolResultForClaude(result: ToolResult): string {
     response.data = result.data;
   }
 
+  if (result.hasData) {
+    response.hasData = true;
+    response.displayInstruction = "Format and display this data in a clear, readable way for the user. Include sample records and metadata.";
+  }
+
+  // Remind Claude to include suggestions
+  response.reminderForClaude = "Remember to include [SUGGESTIONS:...] at the end of your response with 2-4 contextual next steps.";
+
   return JSON.stringify(response);
 }

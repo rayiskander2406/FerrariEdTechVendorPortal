@@ -85,7 +85,7 @@ export interface PodsApplication {
   applicationName: string;
   contactEmail: string;
   status: "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
-  accessTier: "TOKEN_ONLY" | "SELECTIVE" | "FULL_ACCESS";
+  accessTier: "PRIVACY_SAFE" | "SELECTIVE" | "FULL_ACCESS";
   submittedAt: Date | null;
   reviewedAt: Date | null;
   expiresAt: Date | null;
@@ -685,6 +685,109 @@ export function getOneRosterResponse(
       };
     }
 
+    case "/courses": {
+      // Generate courses from unique class subjects
+      const subjects = [...new Set(data.classes.map((c) => c.subject))];
+      const courses = subjects.map((subject, idx) => ({
+        sourcedId: `CRS_${subject.toUpperCase().replace(/\s+/g, "_")}_${idx}`,
+        status: "active" as const,
+        dateLastModified: dateModified,
+        title: subject,
+        courseCode: `${subject.substring(0, 3).toUpperCase()}${100 + idx}`,
+        grades: ["KG", "1", "2", "3", "4", "5"],
+        subjects: [subject],
+        org: { sourcedId: data.schools[0]?.token ?? "DISTRICT" },
+      }));
+
+      const paginatedCourses = courses.slice(offset, offset + limit);
+      return {
+        courses: paginatedCourses,
+        statusInfoSet: {
+          imsx_codeMajor: "success",
+          imsx_severity: "status",
+          imsx_description: `${paginatedCourses.length} courses returned`,
+        },
+      };
+    }
+
+    case "/academicSessions": {
+      // Generate academic sessions (terms/semesters)
+      const sessions = [
+        {
+          sourcedId: "TERM_2024_FALL",
+          status: "active" as const,
+          dateLastModified: dateModified,
+          title: "Fall 2024",
+          type: "term" as const,
+          startDate: "2024-08-19",
+          endDate: "2024-12-20",
+          schoolYear: "2024-2025",
+        },
+        {
+          sourcedId: "TERM_2025_SPRING",
+          status: "active" as const,
+          dateLastModified: dateModified,
+          title: "Spring 2025",
+          type: "term" as const,
+          startDate: "2025-01-06",
+          endDate: "2025-06-06",
+          schoolYear: "2024-2025",
+        },
+        {
+          sourcedId: "YEAR_2024_2025",
+          status: "active" as const,
+          dateLastModified: dateModified,
+          title: "School Year 2024-2025",
+          type: "schoolYear" as const,
+          startDate: "2024-08-19",
+          endDate: "2025-06-06",
+          schoolYear: "2024-2025",
+        },
+      ];
+
+      const paginatedSessions = sessions.slice(offset, offset + limit);
+      return {
+        academicSessions: paginatedSessions,
+        statusInfoSet: {
+          imsx_codeMajor: "success",
+          imsx_severity: "status",
+          imsx_description: `${paginatedSessions.length} academic sessions returned`,
+        },
+      };
+    }
+
+    case "/demographics": {
+      // Generate demographics for students (tokenized/anonymized)
+      const demographics = data.students.slice(0, Math.min(limit, 100)).map((s) => ({
+        sourcedId: s.token,
+        status: "active" as const,
+        dateLastModified: dateModified,
+        birthDate: "[TOKENIZED]",
+        sex: "[TOKENIZED]",
+        americanIndianOrAlaskaNative: false,
+        asian: false,
+        blackOrAfricanAmerican: false,
+        hispanicOrLatinoEthnicity: false,
+        nativeHawaiianOrOtherPacificIslander: false,
+        white: false,
+        demographicRaceTwoOrMoreRaces: false,
+        countryOfBirthCode: "[TOKENIZED]",
+        stateOfBirthAbbreviation: "[TOKENIZED]",
+        cityOfBirth: "[TOKENIZED]",
+        publicSchoolResidenceStatus: "[TOKENIZED]",
+      }));
+
+      const paginatedDemographics = demographics.slice(offset, offset + limit);
+      return {
+        demographics: paginatedDemographics,
+        statusInfoSet: {
+          imsx_codeMajor: "success",
+          imsx_severity: "status",
+          imsx_description: `${paginatedDemographics.length} demographics returned (tokenized)`,
+        },
+      };
+    }
+
     default:
       return {
         statusInfoSet: {
@@ -717,7 +820,7 @@ export function getMockPodsDatabase(): PodsApplication[] {
       applicationName: "MathWhiz Student Portal",
       contactEmail: "integration@mathwhiz.com",
       status: "APPROVED",
-      accessTier: "TOKEN_ONLY",
+      accessTier: "PRIVACY_SAFE",
       submittedAt: oneMonthAgo,
       reviewedAt: twoWeeksAgo,
       expiresAt: oneYearFromNow,
@@ -739,7 +842,7 @@ export function getMockPodsDatabase(): PodsApplication[] {
       applicationName: "Virtual Lab Environment",
       contactEmail: "admin@sciencelabpro.com",
       status: "PENDING_REVIEW",
-      accessTier: "TOKEN_ONLY",
+      accessTier: "PRIVACY_SAFE",
       submittedAt: oneWeekAgo,
       reviewedAt: null,
       expiresAt: null,

@@ -13,6 +13,7 @@
 import { useState, useCallback, useRef } from "react";
 import { type VendorContext, type AccessTier, type SandboxCredentials, type IntegrationConfig } from "@/lib/types";
 import { NetworkError, getUserErrorMessage } from "@/lib/errors";
+import { getLastFormTrigger } from "@/lib/config/forms";
 
 // =============================================================================
 // TYPES
@@ -56,6 +57,7 @@ export interface UseChatReturn {
   activeForm: string | null;
   vendorState: VendorState;
   error: string | null;
+  suggestedResponses: string[];
   sendMessage: (content: string) => Promise<void>;
   setActiveForm: (form: string | null) => void;
   updateVendorState: (updates: Partial<VendorState>) => void;
@@ -78,7 +80,7 @@ const INITIAL_VENDOR_STATE: VendorState = {
 };
 
 const FETCH_TIMEOUT_MS = 30000; // 30 seconds
-const FORM_TRIGGER_REGEX = /\[FORM:([A-Z_]+)\]/g;
+const SUGGESTIONS_REGEX = /\[SUGGESTIONS:(.*?)\]/g;
 
 // =============================================================================
 // HOOK
@@ -91,9 +93,16 @@ export function useChat(): UseChatReturn {
   const [activeForm, setActiveFormState] = useState<string | null>(null);
   const [vendorState, setVendorState] = useState<VendorState>(INITIAL_VENDOR_STATE);
   const [error, setError] = useState<string | null>(null);
+  const [suggestedResponses, setSuggestedResponses] = useState<string[]>([]);
 
   // Refs
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // CRITICAL: Use ref for isLoading to avoid stale closure issues in sendMessage
+  // The ref is updated synchronously so it always reflects the current state
+  const isLoadingRef = useRef(isLoading);
+  // Update ref synchronously during render (not in useEffect) to avoid timing gaps
+  isLoadingRef.current = isLoading;
 
   // ==========================================================================
   // UTILITY FUNCTIONS
@@ -108,16 +117,27 @@ export function useChat(): UseChatReturn {
 
   /**
    * Detect form triggers in AI response
+   * Uses centralized getLastFormTrigger from lib/config/forms.ts
    */
   const detectFormTriggers = useCallback((content: string): string | null => {
-    const matches = content.match(FORM_TRIGGER_REGEX);
+    return getLastFormTrigger(content);
+  }, []);
+
+  /**
+   * Extract suggested responses from AI response
+   * Format: [SUGGESTIONS:option1|option2|option3]
+   */
+  const extractSuggestions = useCallback((content: string): string[] => {
+    const matches = content.match(SUGGESTIONS_REGEX);
     if (matches && matches.length > 0) {
-      // Get the last form trigger (in case there are multiple)
+      // Get the last suggestions block
       const lastMatch = matches[matches.length - 1];
-      const formName = lastMatch?.replace("[FORM:", "").replace("]", "").toLowerCase();
-      return formName ?? null;
+      const suggestionsStr = lastMatch?.replace("[SUGGESTIONS:", "").replace("]", "");
+      if (suggestionsStr) {
+        return suggestionsStr.split("|").map(s => s.trim()).filter(s => s.length > 0);
+      }
     }
-    return null;
+    return [];
   }, []);
 
   /**
@@ -135,7 +155,7 @@ export function useChat(): UseChatReturn {
             name: vendorState.companyName ?? "Unknown",
             contactEmail: "", // Would be populated from actual vendor data
             contactName: "",
-            accessTier: vendorState.accessTier ?? "TOKEN_ONLY",
+            accessTier: vendorState.accessTier ?? "PRIVACY_SAFE",
             podsStatus: (vendorState.podsStatus as "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED") ?? "NOT_STARTED",
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -154,15 +174,28 @@ export function useChat(): UseChatReturn {
 
   /**
    * Send a message and stream the AI response
+   * CRITICAL: Uses isLoadingRef.current instead of isLoading closure
+   * to ensure we always check the CURRENT loading state, not a stale closure value.
+   * This fixes the demo mode race condition where messages were silently dropped.
    */
   const sendMessage = useCallback(
     async (content: string): Promise<void> => {
-      if (!content.trim() || isLoading) {
+      // Use ref to check current isLoading state, not closure value
+      // This is critical for demo mode where ref chains can have timing gaps
+      if (!content.trim() || isLoadingRef.current) {
+        console.log("[useChat] sendMessage blocked:", {
+          emptyContent: !content.trim(),
+          isLoading: isLoadingRef.current
+        });
         return;
       }
 
-      // Clear any previous error
+      // Clear any previous error and suggestions
+      // NOTE: DO NOT clear activeForm here - let it persist until explicitly closed
+      // or a new form is triggered. Clearing it causes flash/glitch as form unmounts
+      // and remounts during the API response cycle.
       setError(null);
+      setSuggestedResponses([]);
 
       // Create user message
       const userMessage: ChatMessage = {
@@ -368,6 +401,12 @@ export function useChat(): UseChatReturn {
         if (formTrigger) {
           setActiveFormState(formTrigger);
         }
+
+        // Extract and set suggested responses
+        const suggestions = extractSuggestions(accumulatedContent);
+        if (suggestions.length > 0) {
+          setSuggestedResponses(suggestions);
+        }
       } catch (err) {
         // Handle different error types with user-friendly messages
         let errorMessage: string;
@@ -415,11 +454,13 @@ export function useChat(): UseChatReturn {
       }
     },
     [
-      isLoading,
+      // NOTE: isLoading is NOT in deps - we use isLoadingRef.current instead
+      // This prevents stale closure issues and ensures stable sendMessage reference
       messages,
       generateMessageId,
       buildVendorContext,
       detectFormTriggers,
+      extractSuggestions,
     ]
   );
 
@@ -451,6 +492,7 @@ export function useChat(): UseChatReturn {
     setIsLoading(false);
     setActiveFormState(null);
     setError(null);
+    setSuggestedResponses([]);
   }, []);
 
   /**
@@ -470,6 +512,7 @@ export function useChat(): UseChatReturn {
     activeForm,
     vendorState,
     error,
+    suggestedResponses,
     sendMessage,
     setActiveForm,
     updateVendorState,

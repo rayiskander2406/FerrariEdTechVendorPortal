@@ -21,12 +21,12 @@ const sampleMessages: ChatMessage[] = [
     role: "assistant",
     content: `Welcome to LAUSD's Vendor Integration Portal! I'm here to help **MathPractice Pro** get integrated quickly and securely.
 
-Most math practice applications work perfectly with our **TOKEN_ONLY** tier, which provides:
+Most math practice applications work perfectly with our **Privacy-Safe** tier, which provides:
 - Unique student identifiers (tokens like \`TKN_STU_8X9Y2Z\`)
 - First names for personalization
 - Grade levels for content alignment
 
-The best part? TOKEN_ONLY access can be **approved in minutes**!
+The best part? Privacy-Safe access can be **approved in minutes**!
 
 Would you like me to start the PoDS-Lite application?`,
     timestamp: new Date(Date.now() - 30000),
@@ -105,7 +105,7 @@ export default function TestPage() {
                       isOnboarded: true,
                       vendorId: "test-123",
                       companyName: "Test Vendor",
-                      accessTier: "TOKEN_ONLY",
+                      accessTier: "PRIVACY_SAFE",
                       podsStatus: "APPROVED",
                       credentials: null,
                       integrations: [],

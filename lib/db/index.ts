@@ -14,6 +14,7 @@ import {
   type PodsStatus,
   type SandboxStatus,
 } from "@/lib/types";
+import { validateEndpoints } from "@/lib/config/oneroster";
 
 // =============================================================================
 // CONFIGURATION
@@ -87,7 +88,7 @@ export async function createVendor(data: CreateVendorInput): Promise<Vendor> {
   const id = generateUuid();
 
   // Determine access tier based on data elements requested
-  // TOKEN_ONLY if no sensitive PII requested
+  // PRIVACY_SAFE if no sensitive PII requested
   const sensitiveElements = [
     "LAST_NAME",
     "EMAIL",
@@ -100,10 +101,10 @@ export async function createVendor(data: CreateVendorInput): Promise<Vendor> {
     sensitiveElements.includes(el)
   );
 
-  const accessTier: AccessTier = data.accessTier ?? (requestsSensitive ? "SELECTIVE" : "TOKEN_ONLY");
+  const accessTier: AccessTier = data.accessTier ?? (requestsSensitive ? "SELECTIVE" : "PRIVACY_SAFE");
 
-  // TOKEN_ONLY gets auto-approved, others need review
-  const podsStatus: PodsStatus = accessTier === "TOKEN_ONLY" ? "APPROVED" : "PENDING_REVIEW";
+  // PRIVACY_SAFE gets auto-approved, others need review
+  const podsStatus: PodsStatus = accessTier === "PRIVACY_SAFE" ? "APPROVED" : "PENDING_REVIEW";
 
   const vendor: Vendor = {
     id,
@@ -218,8 +219,15 @@ export async function listVendors(): Promise<Vendor[]> {
 
 /**
  * Create sandbox credentials for a vendor
+ * @param vendorId - The vendor's ID
+ * @param requestedEndpoints - Optional array of OneRoster endpoints the vendor requested
+ *
+ * @see lib/config/oneroster.ts for endpoint configuration (single source of truth)
  */
-export async function createSandbox(vendorId: string): Promise<SandboxCredentials> {
+export async function createSandbox(
+  vendorId: string,
+  requestedEndpoints?: string[]
+): Promise<SandboxCredentials> {
   if (!USE_MOCK_DB) {
     throw new Error("Real database not implemented yet");
   }
@@ -237,6 +245,9 @@ export async function createSandbox(vendorId: string): Promise<SandboxCredential
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days
 
+  // Use centralized endpoint validation (handles normalization, deduplication, defaults)
+  const allowedEndpoints = validateEndpoints(requestedEndpoints);
+
   const sandbox: SandboxCredentials = {
     id: generateUuid(),
     vendorId,
@@ -249,7 +260,7 @@ export async function createSandbox(vendorId: string): Promise<SandboxCredential
     createdAt: now,
     lastUsedAt: undefined,
     rateLimitPerMinute: 60,
-    allowedEndpoints: ["/users", "/orgs", "/classes", "/enrollments", "/courses"],
+    allowedEndpoints,
   };
 
   sandboxStore.set(vendorId, sandbox);

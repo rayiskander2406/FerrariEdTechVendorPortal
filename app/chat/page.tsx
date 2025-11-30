@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useState, useCallback, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { Send, CheckCircle2, Loader2, AlertCircle, X } from "lucide-react";
+import { Send, CheckCircle2, Loader2, AlertCircle, X, Settings, Play } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/lib/hooks/useChat";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -13,6 +14,7 @@ import { useToast } from "@/components/ui/Toast";
 // Form components
 import { PodsLiteForm } from "@/components/forms/PodsLiteForm";
 import { SsoConfigForm, type SsoConfig } from "@/components/forms/SsoConfigForm";
+import { LtiConfigForm, type LtiConfig } from "@/components/forms/LtiConfigForm";
 import { ApiTester } from "@/components/forms/ApiTester";
 import { CommTestForm, type CommMessage } from "@/components/forms/CommTestForm";
 import { AppSubmitForm, type AppSubmission } from "@/components/forms/AppSubmitForm";
@@ -37,6 +39,7 @@ export default function ChatPage() {
     activeForm,
     vendorState,
     error,
+    suggestedResponses,
     sendMessage,
     setActiveForm,
     updateVendorState,
@@ -49,22 +52,43 @@ export default function ChatPage() {
   // Local state
   const [inputValue, setInputValue] = useState("");
 
-  // Ref to always have latest sendMessage function
+  // Ref to always have latest sendMessage function for suggestion chips
   const sendMessageRef = useRef(sendMessage);
-  useEffect(() => {
-    sendMessageRef.current = sendMessage;
-  }, [sendMessage]);
+  sendMessageRef.current = sendMessage;
+
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // ==========================================================================
-  // AUTO-SCROLL
+  // AUTO-SCROLL - Only on new messages, respects user scroll position
   // ==========================================================================
 
+  const lastMessageCountRef = useRef(0);
+  const userHasScrolledRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track if user has scrolled away from bottom
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100; // 100px threshold
+    userHasScrolledRef.current = !isAtBottom;
+  }, []);
+
+  // Only auto-scroll when a NEW message is added (not during streaming updates)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading, activeForm]);
+    const messageCount = messages.length;
+    const isNewMessage = messageCount > lastMessageCountRef.current;
+
+    if (isNewMessage && !userHasScrolledRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    lastMessageCountRef.current = messageCount;
+  }, [messages.length]); // Only trigger on message count change, not content updates
 
   // ==========================================================================
   // SHOW TOAST ON ERROR
@@ -93,6 +117,8 @@ export default function ChatPage() {
   /**
    * Handle PoDS-Lite form submission
    * Creates vendor and sandbox credentials
+   * NOTE: The PodsLiteForm handles its own internal step flow (submitted → credentials),
+   *       so we do NOT call setActiveForm here - that would override the form's internal state
    */
   const handlePodsLiteSubmit = useCallback(
     async (data: PodsLiteInput) => {
@@ -103,7 +129,7 @@ export default function ChatPage() {
         // Create sandbox credentials
         const creds = await createSandbox(vendor.id);
 
-        // Update vendor state
+        // Update vendor state (but don't change activeForm - let PodsLiteForm handle its own flow)
         updateVendorState({
           isOnboarded: true,
           vendorId: vendor.id,
@@ -113,8 +139,8 @@ export default function ChatPage() {
           credentials: creds,
         });
 
-        // Show credentials display
-        setActiveForm("credentials");
+        // NOTE: Removed setActiveForm("credentials") - PodsLiteForm now handles
+        // its own internal step progression: form → verification → submitted → credentials
 
         // Show success toast
         toast.success(`Welcome ${data.vendorName}! Your PoDS-Lite application has been approved.`);
@@ -128,7 +154,7 @@ export default function ChatPage() {
         throw err;
       }
     },
-    [updateVendorState, setActiveForm, addSystemMessage, toast]
+    [updateVendorState, addSystemMessage, toast]
   );
 
   /**
@@ -161,7 +187,7 @@ export default function ChatPage() {
               vendorId: vendorState.vendorId ?? "",
               type: "SSO",
               status: "ACTIVE",
-              ssoProvider: config.provider === "SCHOOLOGY" ? "CLEVER" : config.provider === "CLEVER" ? "CLEVER" : "GOOGLE",
+              ssoProvider: config.provider === "SCHOOLDAY" ? "CLEVER" : config.provider === "CLEVER" ? "CLEVER" : "GOOGLE",
               ssoRedirectUri: config.redirectUri,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -180,6 +206,62 @@ export default function ChatPage() {
       } catch (err) {
         console.error("Failed to save SSO config:", err);
         toast.error("Failed to save SSO configuration. Please try again.");
+        throw err;
+      }
+    },
+    [vendorState, updateVendorState, setActiveForm, addSystemMessage, toast]
+  );
+
+  /**
+   * Handle LTI configuration submission
+   */
+  const handleLtiSubmit = useCallback(
+    async (config: LtiConfig) => {
+      try {
+        // Log the LTI configuration
+        if (vendorState.vendorId) {
+          await logAuditEvent({
+            vendorId: vendorState.vendorId,
+            action: "config.lti",
+            resourceType: "integration",
+            resourceId: `lti_${config.deploymentId}`,
+            details: {
+              clientId: config.clientId,
+              deploymentId: config.deploymentId,
+              launchUrl: config.launchUrl,
+              jwksUrl: config.jwksUrl,
+            },
+          });
+        }
+
+        // Update vendor state with LTI integration
+        updateVendorState({
+          integrations: [
+            ...vendorState.integrations,
+            {
+              id: crypto.randomUUID(),
+              vendorId: vendorState.vendorId ?? "",
+              type: "LTI",
+              status: "ACTIVE",
+              ltiClientId: config.clientId,
+              ltiDeploymentId: config.deploymentId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        });
+
+        setActiveForm(null);
+
+        // Show success toast
+        toast.success("LTI 1.3 configuration saved successfully.");
+
+        addSystemMessage(
+          `LTI 1.3 integration has been configured for Schoology. Your tool can now receive launches from LAUSD's LMS.`
+        );
+      } catch (err) {
+        console.error("Failed to save LTI config:", err);
+        toast.error("Failed to save LTI configuration. Please try again.");
         throw err;
       }
     },
@@ -329,6 +411,7 @@ export default function ChatPage() {
           <PodsLiteForm
             onSubmit={handlePodsLiteSubmit}
             onCancel={handleCloseForm}
+            onTestApi={() => setActiveForm("api_tester")}
             prefill={
               vendorState.companyName
                 ? { vendorName: vendorState.companyName }
@@ -341,6 +424,14 @@ export default function ChatPage() {
         return (
           <SsoConfigForm
             onSubmit={handleSsoSubmit}
+            onCancel={handleCloseForm}
+          />
+        );
+
+      case "lti_config":
+        return (
+          <LtiConfigForm
+            onSubmit={handleLtiSubmit}
             onCancel={handleCloseForm}
           />
         );
@@ -446,6 +537,25 @@ export default function ChatPage() {
                 </span>
                 <span className="text-[10px] sm:text-xs font-medium text-success-700">AI Online</span>
               </div>
+
+              {/* Demo Guide Link */}
+              <Link
+                href="/demo"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-primary to-purple-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
+                title="Demo Walkthrough Guide"
+              >
+                <Play className="w-3.5 h-3.5" />
+                Demo
+              </Link>
+
+              {/* Feature Flags Dashboard Link */}
+              <Link
+                href="/dashboard/features"
+                className="p-1.5 sm:p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Feature Flags Dashboard"
+              >
+                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Link>
             </div>
           </div>
         </div>
@@ -474,7 +584,12 @@ export default function ChatPage() {
       )}
 
       {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto" role="main">
+      <main
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto"
+        role="main"
+      >
         <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
           {/* Welcome message if no messages */}
           {messages.length === 0 && !activeForm && (
@@ -496,7 +611,7 @@ export default function ChatPage() {
               <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-2 sm:gap-4 text-xs sm:text-sm px-2">
                 <div className="flex items-center justify-center gap-2 bg-white rounded-full px-3 sm:px-4 py-2 shadow-sm border border-gray-100">
                   <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true" />
-                  <span className="text-gray-700">Instant TOKEN_ONLY approval</span>
+                  <span className="text-gray-700">Instant Privacy-Safe approval</span>
                 </div>
                 <div className="flex items-center justify-center gap-2 bg-white rounded-full px-3 sm:px-4 py-2 shadow-sm border border-gray-100">
                   <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true" />
@@ -521,9 +636,13 @@ export default function ChatPage() {
               <TypingIndicator />
             )}
 
-            {/* Active Form */}
+            {/* Active Form - uses stable key to prevent animation replay on same form */}
             {activeForm && (
-              <div className="mt-4 animate-slide-in-bottom">
+              <div
+                key={`form-${activeForm}`}
+                className="mt-4 animate-slide-in-bottom"
+                style={{ willChange: "transform, opacity" }}
+              >
                 <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
                   {/* Form Header - only show for forms that need close button */}
                   {activeForm !== "api_tester" && (
@@ -564,6 +683,7 @@ export default function ChatPage() {
               <SuggestionChips
                 onSelect={handleSuggestionSelect}
                 vendorState={vendorState}
+                contextualSuggestions={suggestedResponses}
                 disabled={isLoading}
               />
             </div>
