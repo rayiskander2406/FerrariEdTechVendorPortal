@@ -53,7 +53,7 @@ export const testScenarios: TestScenario[] = [
     name: "Getting Started Query",
     category: "Onboarding",
     userMessage: "How do I get started as an EdTech vendor?",
-    expectedKeywords: ["PoDS-Lite", "TOKEN_ONLY", "privacy"],
+    expectedKeywords: ["PoDS-Lite", "Privacy-Safe", "privacy"],
     expectedForm: "pods_lite",
     description: "Getting started should explain the onboarding process",
   },
@@ -62,7 +62,7 @@ export const testScenarios: TestScenario[] = [
     name: "Existing Valid PoDS ID",
     category: "Onboarding",
     userMessage: "I have PoDS PODS-2024-0001",
-    expectedKeywords: ["Acme", "Approved", "TOKEN_ONLY"],
+    expectedKeywords: ["Acme", "Approved", "Privacy-Safe"],
     description: "Valid PoDS ID should return vendor details",
   },
   {
