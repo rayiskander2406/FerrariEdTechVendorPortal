@@ -1,0 +1,583 @@
+/**
+ * Database Layer Unit Tests
+ *
+ * Tests for the in-memory mock database layer.
+ *
+ * @module tests/lib/db
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  createVendor,
+  getVendor,
+  getVendorByEmail,
+  updateVendor,
+  listVendors,
+  createSandbox,
+  getSandbox,
+  updateSandboxLastUsed,
+  revokeSandbox,
+  logAuditEvent,
+  getAuditLogs,
+  getAllAuditLogs,
+  clearAllStores,
+  getDbStats,
+  isMockMode,
+  seedDatabase,
+} from '@/lib/db';
+import type { PodsLiteInput } from '@/lib/types';
+
+// =============================================================================
+// FIXTURES
+// =============================================================================
+
+function createMockPodsLiteInput(overrides: Partial<PodsLiteInput> = {}): PodsLiteInput {
+  return {
+    vendorName: 'Test Vendor',
+    contactEmail: 'test@vendor.com',
+    contactName: 'Test User',
+    contactPhone: '555-0100',
+    applicationName: 'Test App',
+    applicationDescription: 'Test description',
+    dataElementsRequested: ['STUDENT_ID', 'FIRST_NAME', 'GRADE_LEVEL'],
+    dataPurpose: 'Testing',
+    dataRetentionDays: 365,
+    integrationMethod: 'ONEROSTER_API',
+    thirdPartySharing: false,
+    thirdPartyDetails: undefined,
+    hasSOC2: true,
+    hasFERPACertification: true,
+    encryptsDataAtRest: true,
+    encryptsDataInTransit: true,
+    breachNotificationHours: 24,
+    coppaCompliant: true,
+    acceptsTerms: true,
+    acceptsDataDeletion: true,
+    ...overrides,
+  };
+}
+
+// =============================================================================
+// CONFIGURATION TESTS
+// =============================================================================
+
+describe('Database Configuration', () => {
+  it('should be in mock mode', () => {
+    expect(isMockMode()).toBe(true);
+  });
+});
+
+// =============================================================================
+// VENDOR TESTS
+// =============================================================================
+
+describe('Vendor Operations', () => {
+  describe('createVendor', () => {
+    it('should create vendor with PRIVACY_SAFE tier for non-sensitive data', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      expect(vendor.id).toBeDefined();
+      expect(vendor.name).toBe('Test Vendor');
+      expect(vendor.contactEmail).toBe('test@vendor.com');
+      expect(vendor.accessTier).toBe('PRIVACY_SAFE');
+      expect(vendor.podsStatus).toBe('APPROVED');
+    });
+
+    it('should create vendor with SELECTIVE tier for sensitive data', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({
+          dataElementsRequested: ['STUDENT_ID', 'EMAIL', 'PHONE'],
+        }),
+      });
+
+      expect(vendor.accessTier).toBe('SELECTIVE');
+      expect(vendor.podsStatus).toBe('PENDING_REVIEW');
+    });
+
+    it('should allow overriding access tier', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+        accessTier: 'FULL_ACCESS',
+      });
+
+      expect(vendor.accessTier).toBe('FULL_ACCESS');
+    });
+
+    it('should generate unique IDs', async () => {
+      const vendor1 = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      const vendor2 = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'Vendor 2' }),
+      });
+
+      expect(vendor1.id).not.toBe(vendor2.id);
+    });
+
+    it('should generate PoDS application ID', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      expect(vendor.podsApplicationId).toMatch(/^PODS-\d{4}-\d{3}$/);
+    });
+
+    it('should set timestamps', async () => {
+      const before = new Date();
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      const after = new Date();
+
+      expect(vendor.createdAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(vendor.createdAt.getTime()).toBeLessThanOrEqual(after.getTime());
+      expect(vendor.updatedAt).toEqual(vendor.createdAt);
+    });
+
+    it('should detect sensitive data elements correctly', async () => {
+      type DataElementType = "STUDENT_ID" | "FIRST_NAME" | "LAST_NAME" | "EMAIL" | "GRADE_LEVEL" | "SCHOOL_ID" | "CLASS_ROSTER" | "TEACHER_ID" | "PHONE" | "ADDRESS" | "DEMOGRAPHICS" | "SPECIAL_ED" | "ATTENDANCE" | "GRADES";
+      const sensitiveElements: DataElementType[] = ['LAST_NAME', 'EMAIL', 'PHONE', 'ADDRESS', 'DEMOGRAPHICS', 'SPECIAL_ED'];
+
+      for (const element of sensitiveElements) {
+        clearAllStores();
+        const vendor = await createVendor({
+          podsLiteInput: createMockPodsLiteInput({
+            dataElementsRequested: ['STUDENT_ID', element],
+          }),
+        });
+        expect(vendor.accessTier).toBe('SELECTIVE');
+      }
+    });
+  });
+
+  describe('getVendor', () => {
+    it('should return vendor by ID', async () => {
+      const created = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      const retrieved = await getVendor(created.id);
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.id).toBe(created.id);
+    });
+
+    it('should return null for non-existent ID', async () => {
+      const result = await getVendor('non-existent-id');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getVendorByEmail', () => {
+    it('should return vendor by email', async () => {
+      await createVendor({
+        podsLiteInput: createMockPodsLiteInput({
+          contactEmail: 'unique@vendor.com',
+        }),
+      });
+
+      const retrieved = await getVendorByEmail('unique@vendor.com');
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.contactEmail).toBe('unique@vendor.com');
+    });
+
+    it('should return null for non-existent email', async () => {
+      const result = await getVendorByEmail('nonexistent@vendor.com');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('updateVendor', () => {
+    it('should update vendor fields', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      const updated = await updateVendor(vendor.id, {
+        name: 'Updated Name',
+        podsStatus: 'PENDING_REVIEW',
+      });
+
+      expect(updated?.name).toBe('Updated Name');
+      expect(updated?.podsStatus).toBe('PENDING_REVIEW');
+    });
+
+    it('should update updatedAt timestamp', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const updated = await updateVendor(vendor.id, { name: 'New Name' });
+
+      expect(updated?.updatedAt.getTime()).toBeGreaterThan(vendor.updatedAt.getTime());
+    });
+
+    it('should return null for non-existent vendor', async () => {
+      const result = await updateVendor('non-existent', { name: 'Test' });
+      expect(result).toBeNull();
+    });
+
+    it('should preserve unchanged fields', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({
+          vendorName: 'Original Name',
+          contactEmail: 'original@test.com',
+        }),
+      });
+
+      await updateVendor(vendor.id, { name: 'New Name' });
+      const retrieved = await getVendor(vendor.id);
+
+      expect(retrieved?.name).toBe('New Name');
+      expect(retrieved?.contactEmail).toBe('original@test.com');
+    });
+  });
+
+  describe('listVendors', () => {
+    it('should return empty array when no vendors', async () => {
+      const vendors = await listVendors();
+      expect(vendors).toEqual([]);
+    });
+
+    it('should return all vendors', async () => {
+      await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'Vendor 1' }),
+      });
+      await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'Vendor 2' }),
+      });
+
+      const vendors = await listVendors();
+
+      expect(vendors).toHaveLength(2);
+    });
+  });
+});
+
+// =============================================================================
+// SANDBOX TESTS
+// =============================================================================
+
+describe('Sandbox Operations', () => {
+  describe('createSandbox', () => {
+    it('should create sandbox for approved vendor', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      const sandbox = await createSandbox(vendor.id);
+
+      expect(sandbox.id).toBeDefined();
+      expect(sandbox.vendorId).toBe(vendor.id);
+      expect(sandbox.apiKey).toMatch(/^sk_test_/);
+      expect(sandbox.apiSecret.length).toBe(64);
+      expect(sandbox.status).toBe('ACTIVE');
+      expect(sandbox.environment).toBe('sandbox');
+    });
+
+    it('should throw for non-existent vendor', async () => {
+      await expect(createSandbox('non-existent')).rejects.toThrow('Vendor not found');
+    });
+
+    it('should throw for non-approved vendor', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({
+          dataElementsRequested: ['EMAIL'], // Triggers SELECTIVE tier
+        }),
+      });
+
+      await expect(createSandbox(vendor.id)).rejects.toThrow('must be approved');
+    });
+
+    it('should set 90-day expiration', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      const before = new Date();
+
+      const sandbox = await createSandbox(vendor.id);
+
+      const expectedExpiry = new Date(before.getTime() + 90 * 24 * 60 * 60 * 1000);
+      expect(sandbox.expiresAt.getTime()).toBeGreaterThanOrEqual(expectedExpiry.getTime() - 1000);
+      expect(sandbox.expiresAt.getTime()).toBeLessThanOrEqual(expectedExpiry.getTime() + 1000);
+    });
+
+    it('should set allowed endpoints', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      const sandbox = await createSandbox(vendor.id);
+
+      expect(sandbox.allowedEndpoints).toContain('/users');
+      expect(sandbox.allowedEndpoints).toContain('/orgs');
+      expect(sandbox.allowedEndpoints).toContain('/classes');
+    });
+
+    it('should set rate limit', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      const sandbox = await createSandbox(vendor.id);
+
+      expect(sandbox.rateLimitPerMinute).toBe(60);
+    });
+  });
+
+  describe('getSandbox', () => {
+    it('should return sandbox by vendor ID', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const sandbox = await getSandbox(vendor.id);
+
+      expect(sandbox).not.toBeNull();
+      expect(sandbox?.vendorId).toBe(vendor.id);
+    });
+
+    it('should return null for vendor without sandbox', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
+      const sandbox = await getSandbox(vendor.id);
+
+      expect(sandbox).toBeNull();
+    });
+  });
+
+  describe('updateSandboxLastUsed', () => {
+    it('should update lastUsedAt timestamp', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      await updateSandboxLastUsed(vendor.id);
+
+      const sandbox = await getSandbox(vendor.id);
+      expect(sandbox?.lastUsedAt).toBeDefined();
+    });
+
+    it('should handle non-existent sandbox gracefully', async () => {
+      await expect(updateSandboxLastUsed('non-existent')).resolves.not.toThrow();
+    });
+  });
+
+  describe('revokeSandbox', () => {
+    it('should revoke sandbox', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const revoked = await revokeSandbox(vendor.id);
+
+      expect(revoked?.status).toBe('REVOKED');
+    });
+
+    it('should return null for non-existent sandbox', async () => {
+      const result = await revokeSandbox('non-existent');
+      expect(result).toBeNull();
+    });
+  });
+});
+
+// =============================================================================
+// AUDIT LOG TESTS
+// =============================================================================
+
+describe('Audit Log Operations', () => {
+  describe('logAuditEvent', () => {
+    it('should log audit event', async () => {
+      const log = await logAuditEvent({
+        vendorId: 'vendor-123',
+        action: 'TEST_ACTION',
+        resourceType: 'test',
+        resourceId: 'resource-456',
+        details: { key: 'value' },
+      });
+
+      expect(log.id).toBeDefined();
+      expect(log.vendorId).toBe('vendor-123');
+      expect(log.action).toBe('TEST_ACTION');
+      expect(log.resourceType).toBe('test');
+      expect(log.resourceId).toBe('resource-456');
+      expect(log.details).toEqual({ key: 'value' });
+      expect(log.timestamp).toBeInstanceOf(Date);
+    });
+
+    it('should include optional IP and user agent', async () => {
+      const log = await logAuditEvent({
+        vendorId: 'vendor-123',
+        action: 'LOGIN',
+        resourceType: 'session',
+        ipAddress: '192.168.1.1',
+        userAgent: 'Mozilla/5.0',
+      });
+
+      expect(log.ipAddress).toBe('192.168.1.1');
+      expect(log.userAgent).toBe('Mozilla/5.0');
+    });
+  });
+
+  describe('getAuditLogs', () => {
+    it('should return logs for vendor', async () => {
+      await logAuditEvent({
+        vendorId: 'vendor-123',
+        action: 'ACTION_1',
+        resourceType: 'test',
+      });
+      await logAuditEvent({
+        vendorId: 'vendor-123',
+        action: 'ACTION_2',
+        resourceType: 'test',
+      });
+      await logAuditEvent({
+        vendorId: 'other-vendor',
+        action: 'ACTION_3',
+        resourceType: 'test',
+      });
+
+      const logs = await getAuditLogs('vendor-123');
+
+      expect(logs).toHaveLength(2);
+      expect(logs.every((l) => l.vendorId === 'vendor-123')).toBe(true);
+    });
+
+    it('should return logs in reverse chronological order', async () => {
+      await logAuditEvent({
+        vendorId: 'vendor-123',
+        action: 'FIRST',
+        resourceType: 'test',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await logAuditEvent({
+        vendorId: 'vendor-123',
+        action: 'SECOND',
+        resourceType: 'test',
+      });
+
+      const logs = await getAuditLogs('vendor-123');
+
+      expect(logs[0]?.action).toBe('SECOND');
+      expect(logs[1]?.action).toBe('FIRST');
+    });
+
+    it('should respect limit parameter', async () => {
+      for (let i = 0; i < 10; i++) {
+        await logAuditEvent({
+          vendorId: 'vendor-123',
+          action: `ACTION_${i}`,
+          resourceType: 'test',
+        });
+      }
+
+      const logs = await getAuditLogs('vendor-123', 5);
+
+      expect(logs).toHaveLength(5);
+    });
+
+    it('should return empty array for vendor with no logs', async () => {
+      const logs = await getAuditLogs('no-logs-vendor');
+      expect(logs).toEqual([]);
+    });
+  });
+
+  describe('getAllAuditLogs', () => {
+    it('should return all logs', async () => {
+      await logAuditEvent({
+        vendorId: 'vendor-1',
+        action: 'ACTION_1',
+        resourceType: 'test',
+      });
+      await logAuditEvent({
+        vendorId: 'vendor-2',
+        action: 'ACTION_2',
+        resourceType: 'test',
+      });
+
+      const logs = await getAllAuditLogs();
+
+      expect(logs.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should respect limit parameter', async () => {
+      const logs = await getAllAuditLogs(3);
+      expect(logs.length).toBeLessThanOrEqual(3);
+    });
+  });
+});
+
+// =============================================================================
+// UTILITY TESTS
+// =============================================================================
+
+describe('Database Utilities', () => {
+  describe('clearAllStores', () => {
+    it('should clear all data', async () => {
+      await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await logAuditEvent({
+        vendorId: 'test',
+        action: 'TEST',
+        resourceType: 'test',
+      });
+
+      clearAllStores();
+
+      const vendors = await listVendors();
+      const stats = getDbStats();
+
+      expect(vendors).toEqual([]);
+      expect(stats.vendors).toBe(0);
+      expect(stats.sandboxes).toBe(0);
+      expect(stats.auditLogs).toBe(0);
+    });
+  });
+
+  describe('getDbStats', () => {
+    it('should return accurate counts', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const stats = getDbStats();
+
+      expect(stats.vendors).toBe(1);
+      expect(stats.sandboxes).toBe(1);
+      expect(stats.auditLogs).toBeGreaterThan(0);
+    });
+  });
+
+  describe('seedDatabase', () => {
+    it('should seed with sample data', async () => {
+      await seedDatabase();
+
+      const vendors = await listVendors();
+      expect(vendors.length).toBeGreaterThan(0);
+    });
+
+    it('should not seed if already has data', async () => {
+      await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'Existing' }),
+      });
+
+      await seedDatabase();
+
+      const vendors = await listVendors();
+      // Should still have only one vendor
+      expect(vendors.find((v) => v.name === 'Demo EdTech Vendor')).toBeUndefined();
+    });
+  });
+});
