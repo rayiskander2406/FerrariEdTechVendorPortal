@@ -6,7 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "typecheck": "tsc --noEmit",
+    "pii-check": "./scripts/pii-check.sh",
+    "pre-commit": "./scripts/pre-commit-check.sh",
+    "quality": "npm run typecheck && npm run pii-check && npm run lint",
+    "validate-demo": "npx tsx scripts/validate-demo.ts",
+    "demo-ready": "npm run quality && npm run validate-demo",
+    "changelog": "./scripts/generate-changelog.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
@@ -19,14 +30,20 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitest/coverage-v8": "^4.0.14",
     "eslint": "^8",
     "eslint-config-next": "14.2.33",
+    "jsdom": "^27.2.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.20.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.14"
   }
 }

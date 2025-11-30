@@ -28,6 +28,9 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# Claude Code local settings (user-specific)
+.claude/settings.local.json
+
 # API keys
 api.key
 *.key
