@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, type FormEvent } from "react";
+import React, { useState, useCallback, useMemo, useEffect, type FormEvent } from "react";
 import { z } from "zod";
 import {
   Mail,
@@ -10,9 +10,30 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle2,
+  DollarSign,
+  Shield,
+  Lock,
+  FileText,
+  Clock,
+  TrendingUp,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SYNTHETIC_DATA } from "@/lib/data/synthetic";
+import {
+  CPAAS_CHANNELS,
+  DEFAULT_PRICES,
+  DELIVERY_STATUSES,
+  DELIVERY_STATUS_ORDER,
+  DELIVERY_SIMULATION,
+  LAUSD_SCALE,
+  PRIVACY_BADGES,
+  calculateMessageCost,
+  formatCurrency,
+  generateMessageId,
+  type CpaasChannelId,
+  type DeliveryStatusId,
+} from "@/lib/config/cpaas";
 
 // =============================================================================
 // TYPES
@@ -57,11 +78,214 @@ const SmsSchema = z.object({
 // CONSTANTS
 // =============================================================================
 
-const SMS_SEGMENT_LENGTH = 160;
+const SMS_SEGMENT_LENGTH = CPAAS_CHANNELS.SMS.segmentLength!;
 const MAX_SMS_SEGMENTS = 3;
 
 // =============================================================================
-// COMPONENT
+// DELIVERY STATUS COMPONENT
+// =============================================================================
+
+interface DeliveryStatusProps {
+  currentStatus: DeliveryStatusId | null;
+  messageId: string | null;
+}
+
+function DeliveryStatusTimeline({ currentStatus, messageId }: DeliveryStatusProps) {
+  if (!currentStatus || !messageId) return null;
+
+  const currentIndex = DELIVERY_STATUS_ORDER.indexOf(currentStatus);
+
+  return (
+    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Zap className="w-5 h-5 text-emerald-600" />
+        <span className="font-medium text-emerald-800">Message Status</span>
+        <span className="text-xs text-emerald-600 ml-auto font-mono">{messageId}</span>
+      </div>
+
+      {/* Timeline */}
+      <div className="flex items-center justify-between">
+        {DELIVERY_STATUS_ORDER.slice(0, 3).map((statusId, index) => {
+          const status = DELIVERY_STATUSES[statusId as keyof typeof DELIVERY_STATUSES];
+          const isComplete = index < currentIndex;
+          const isCurrent = index === currentIndex;
+          const isPending = index > currentIndex;
+
+          return (
+            <div key={statusId} className="flex flex-col items-center flex-1">
+              {/* Status icon */}
+              <div
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500",
+                  isComplete && "bg-emerald-500 text-white",
+                  isCurrent && "bg-emerald-500 text-white ring-4 ring-emerald-200 animate-pulse",
+                  isPending && "bg-gray-200 text-gray-400"
+                )}
+              >
+                {isComplete ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : (
+                  <Clock className="w-5 h-5" />
+                )}
+              </div>
+
+              {/* Status label */}
+              <span
+                className={cn(
+                  "text-xs mt-2 font-medium",
+                  isComplete && "text-emerald-600",
+                  isCurrent && "text-emerald-700",
+                  isPending && "text-gray-400"
+                )}
+              >
+                {status.label}
+              </span>
+
+              {/* Connector line */}
+              {index < 2 && (
+                <div
+                  className={cn(
+                    "absolute h-1 w-[calc(33%-20px)] top-5 left-[calc(33%*index+16.5%)]",
+                    index < currentIndex ? "bg-emerald-500" : "bg-gray-200"
+                  )}
+                  style={{
+                    left: `calc(${(index + 1) * 33.33}% - 16.5%)`,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Current status description */}
+      <div className="text-center text-sm text-emerald-700">
+        {DELIVERY_STATUSES[currentStatus as keyof typeof DELIVERY_STATUSES]?.description}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// COST PREVIEW COMPONENT
+// =============================================================================
+
+interface CostPreviewProps {
+  channel: CpaasChannelId;
+  smsSegments?: number;
+}
+
+function CostPreview({ channel, smsSegments = 1 }: CostPreviewProps) {
+  const unitPrice = DEFAULT_PRICES[channel];
+  const totalCost = channel === "SMS" ? unitPrice * smsSegments : unitPrice;
+  const scaleInfo = LAUSD_SCALE.scaleMessage(unitPrice, channel);
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <DollarSign className="w-5 h-5 text-blue-600" />
+        <span className="font-medium text-blue-800">Cost Preview</span>
+      </div>
+
+      {/* Per-message cost */}
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="bg-white rounded-lg p-3 border border-blue-100">
+          <div className="text-gray-500 text-xs mb-1">Per Message</div>
+          <div className="text-xl font-bold text-blue-700">
+            {formatCurrency(totalCost)}
+          </div>
+          {channel === "SMS" && smsSegments > 1 && (
+            <div className="text-xs text-gray-500">
+              ({smsSegments} segments × {formatCurrency(unitPrice)})
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg p-3 border border-blue-100">
+          <div className="text-gray-500 text-xs mb-1">Monthly (30/day)</div>
+          <div className="text-xl font-bold text-blue-700">
+            {formatCurrency(totalCost * 30)}
+          </div>
+        </div>
+      </div>
+
+      {/* Scale calculator */}
+      <div className="bg-white rounded-lg p-3 border border-blue-100">
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp className="w-4 h-4 text-blue-500" />
+          <span className="text-xs font-medium text-gray-700">At LAUSD Scale</span>
+        </div>
+        <div className="text-sm text-gray-600">
+          <span className="font-semibold text-blue-700">{scaleInfo.totalCost}</span>
+          {" "}to reach all {scaleInfo.familyCount} families
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          {scaleInfo.comparisonMessage}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// PRIVACY EXPLAINER COMPONENT
+// =============================================================================
+
+function PrivacyExplainer() {
+  const badgeIcons: Record<string, typeof Shield> = {
+    Shield: Shield,
+    Lock: Lock,
+    FileText: FileText,
+    CheckCircle: CheckCircle2,
+  };
+
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Shield className="w-5 h-5 text-purple-600" />
+        <span className="font-medium text-purple-800">Privacy Protection</span>
+      </div>
+
+      {/* How it works */}
+      <div className="bg-white rounded-lg p-3 border border-purple-100 text-sm">
+        <div className="font-medium text-gray-700 mb-2">How Secure Relay Works</div>
+        <div className="space-y-2 text-gray-600">
+          <div className="flex items-start gap-2">
+            <span className="text-purple-500 font-mono text-xs bg-purple-100 px-1 rounded">1</span>
+            <span>Vendor sends to <code className="text-xs bg-gray-100 px-1 rounded">TKN_STU_xxx</code></span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-purple-500 font-mono text-xs bg-purple-100 px-1 rounded">2</span>
+            <span>SchoolDay resolves token → real contact (hidden)</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-purple-500 font-mono text-xs bg-purple-100 px-1 rounded">3</span>
+            <span>Message delivered via secure relay network</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Privacy badges */}
+      <div className="grid grid-cols-2 gap-2">
+        {Object.values(PRIVACY_BADGES).map((badge) => {
+          const IconComponent = badgeIcons[badge.icon] || Shield;
+          return (
+            <div
+              key={badge.id}
+              className="flex items-center gap-2 bg-white rounded-lg p-2 border border-purple-100"
+            >
+              <IconComponent className="w-4 h-4 text-purple-500 flex-shrink-0" />
+              <span className="text-xs text-gray-700">{badge.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// MAIN COMPONENT
 // =============================================================================
 
 export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
@@ -74,6 +298,11 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Delivery status simulation state
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatusId | null>(null);
+  const [messageId, setMessageId] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Get sample students for recipient dropdown
   const recipients = useMemo(() => {
@@ -100,6 +329,10 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
     setErrors({});
     setSubject("");
     setBody("");
+    // Reset delivery status when changing channel
+    setDeliveryStatus(null);
+    setMessageId(null);
+    setShowSuccess(false);
   }, []);
 
   const clearFieldError = useCallback((field: string) => {
@@ -108,10 +341,32 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
     }
   }, [errors]);
 
+  const simulateDelivery = useCallback(async () => {
+    const newMessageId = generateMessageId();
+    setMessageId(newMessageId);
+
+    // Simulate QUEUED
+    setDeliveryStatus("QUEUED");
+
+    // Simulate SENT after delay
+    await new Promise((resolve) => setTimeout(resolve, DELIVERY_SIMULATION.sentDelay));
+    setDeliveryStatus("SENT");
+
+    // Simulate DELIVERED after delay
+    await new Promise((resolve) =>
+      setTimeout(resolve, DELIVERY_SIMULATION.deliveredDelay - DELIVERY_SIMULATION.sentDelay)
+    );
+    setDeliveryStatus("DELIVERED");
+    setShowSuccess(true);
+  }, []);
+
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
       setSubmitError(null);
+      setDeliveryStatus(null);
+      setMessageId(null);
+      setShowSuccess(false);
 
       const formData = {
         channel,
@@ -139,16 +394,22 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
       setIsSubmitting(true);
 
       try {
+        // Start delivery simulation
+        simulateDelivery();
+
+        // Call actual onSubmit
         await onSubmit(formData as CommMessage);
       } catch (error) {
         setSubmitError(
           error instanceof Error ? error.message : "Failed to send message"
         );
+        setDeliveryStatus(null);
+        setMessageId(null);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [channel, recipientToken, subject, body, onSubmit]
+    [channel, recipientToken, subject, body, onSubmit, simulateDelivery]
   );
 
   // ==========================================================================
@@ -180,7 +441,7 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
             <div>
               <h3 className="font-semibold">Communication Gateway Test</h3>
               <p className="text-sm text-white/80">
-                Test tokenized messaging through SchoolDay relay
+                Test tokenized messaging through SchoolDay Secure Network
               </p>
             </div>
           </div>
@@ -193,9 +454,31 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
               <CheckCircle2 className="w-4 h-4" />
               No PII exposed
             </span>
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="w-4 h-4" />
+              Full audit trail
+            </span>
           </div>
         </div>
       </div>
+
+      {/* Delivery Status Timeline (shows after submit) */}
+      {deliveryStatus && (
+        <DeliveryStatusTimeline currentStatus={deliveryStatus} messageId={messageId} />
+      )}
+
+      {/* Success Message */}
+      {showSuccess && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center gap-3">
+          <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+          <div>
+            <div className="font-medium text-emerald-800">Message Delivered!</div>
+            <div className="text-sm text-emerald-600">
+              The test message was successfully delivered through the secure relay.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Submit Error */}
       {submitError && (
@@ -224,7 +507,7 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
             <Mail className={cn("w-5 h-5", channel === "EMAIL" ? "text-amber-500" : "text-gray-400")} />
             <div className="text-left">
               <div className="font-medium">Email</div>
-              <div className="text-xs opacity-70">Via relay server</div>
+              <div className="text-xs opacity-70">{formatCurrency(DEFAULT_PRICES.EMAIL)}/msg</div>
             </div>
             {channel === "EMAIL" && (
               <CheckCircle2 className="w-5 h-5 text-amber-500 ml-auto" />
@@ -244,7 +527,7 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
             <MessageSquare className={cn("w-5 h-5", channel === "SMS" ? "text-amber-500" : "text-gray-400")} />
             <div className="text-left">
               <div className="font-medium">SMS</div>
-              <div className="text-xs opacity-70">Text message</div>
+              <div className="text-xs opacity-70">{formatCurrency(DEFAULT_PRICES.SMS)}/segment</div>
             </div>
             {channel === "SMS" && (
               <CheckCircle2 className="w-5 h-5 text-amber-500 ml-auto" />
@@ -252,6 +535,9 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
           </button>
         </div>
       </div>
+
+      {/* Cost Preview */}
+      <CostPreview channel={channel} smsSegments={channel === "SMS" ? Math.max(1, smsSegments) : 1} />
 
       {/* Recipient Selection */}
       <div className="space-y-2">
@@ -394,6 +680,9 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
         )}
       </div>
 
+      {/* Privacy Explainer */}
+      <PrivacyExplainer />
+
       {/* Preview */}
       <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
         <h4 className="text-sm font-medium text-gray-700 mb-2">Message Preview</h4>
@@ -430,29 +719,38 @@ export function CommTestForm({ onSubmit, onCancel }: CommTestFormProps) {
           Cancel
         </button>
 
-        <button
-          type="submit"
-          disabled={!isFormValid || isSubmitting}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium",
-            "bg-gradient-to-r from-amber-500 to-orange-500 text-white",
-            "hover:from-amber-600 hover:to-orange-600 active:scale-95",
-            "disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed",
-            "transition-all duration-200"
-          )}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Sending...
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" />
-              Send Test Message
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Show cost in button area */}
+          <span className="text-sm text-gray-500">
+            Est. cost: <span className="font-medium text-blue-600">
+              {formatCurrency(channel === "SMS" ? DEFAULT_PRICES.SMS * Math.max(1, smsSegments) : DEFAULT_PRICES.EMAIL)}
+            </span>
+          </span>
+
+          <button
+            type="submit"
+            disabled={!isFormValid || isSubmitting}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium",
+              "bg-gradient-to-r from-amber-500 to-orange-500 text-white",
+              "hover:from-amber-600 hover:to-orange-600 active:scale-95",
+              "disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed",
+              "transition-all duration-200"
+            )}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Send Test Message
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </form>
   );

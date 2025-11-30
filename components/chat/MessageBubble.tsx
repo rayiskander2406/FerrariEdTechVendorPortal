@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import { Bot, User, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, ToolCallInfo } from "@/lib/hooks/useChat";
@@ -19,6 +19,10 @@ interface MessageBubbleProps {
 
 function parseMarkdown(text: string): string {
   let html = text;
+
+  // Strip out control markers (SUGGESTIONS and FORM triggers) before rendering
+  html = html.replace(/\[SUGGESTIONS:[^\]]*\]/g, "");
+  html = html.replace(/\[FORM:[A-Z_]+\]/g, "");
 
   // Escape HTML
   html = html

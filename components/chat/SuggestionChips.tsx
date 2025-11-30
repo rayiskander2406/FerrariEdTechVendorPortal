@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import {
   FileText,
   Key,
@@ -20,6 +20,7 @@ import type { VendorState } from "@/lib/hooks/useChat";
 
 interface SuggestionChipsProps {
   suggestions?: string[];
+  contextualSuggestions?: string[];
   onSelect: (suggestion: string) => void;
   vendorState?: VendorState;
   disabled?: boolean;
@@ -37,7 +38,7 @@ interface Suggestion {
 
 const INITIAL_SUGGESTIONS: Suggestion[] = [
   {
-    text: "I'm a new vendor and want to integrate with LAUSD",
+    text: "Register my EdTech app for API access",
     icon: <Zap className="w-3.5 h-3.5" />,
     category: "onboarding",
   },
@@ -47,12 +48,12 @@ const INITIAL_SUGGESTIONS: Suggestion[] = [
     category: "onboarding",
   },
   {
-    text: "What is tokenization and how does it work?",
+    text: "What is tokenization?",
     icon: <ShieldCheck className="w-3.5 h-3.5" />,
     category: "help",
   },
   {
-    text: "What data can I access with TOKEN_ONLY tier?",
+    text: "What data can I access?",
     icon: <HelpCircle className="w-3.5 h-3.5" />,
     category: "help",
   },
@@ -65,7 +66,7 @@ const ONBOARDED_SUGGESTIONS: Suggestion[] = [
     category: "integration",
   },
   {
-    text: "Configure SSO with Clever",
+    text: "Configure SSO with SchoolDay",
     icon: <Settings className="w-3.5 h-3.5" />,
     category: "integration",
   },
@@ -110,18 +111,28 @@ const WITH_CREDENTIALS_SUGGESTIONS: Suggestion[] = [
 
 export const SuggestionChips = memo(function SuggestionChips({
   suggestions: customSuggestions,
+  contextualSuggestions,
   onSelect,
   vendorState,
   disabled = false,
 }: SuggestionChipsProps) {
   // Determine which suggestions to show based on vendor state
   const activeSuggestions = useMemo((): Suggestion[] => {
-    // If custom suggestions provided, use those
+    // Priority 1: Contextual suggestions from AI response (highest priority)
+    if (contextualSuggestions && contextualSuggestions.length > 0) {
+      return contextualSuggestions.map((text) => ({
+        text,
+        icon: <Zap className="w-3.5 h-3.5" />,
+        category: "onboarding" as const,
+      }));
+    }
+
+    // Priority 2: Custom suggestions passed as props
     if (customSuggestions && customSuggestions.length > 0) {
       return customSuggestions.map((text) => ({ text }));
     }
 
-    // Otherwise, use state-based suggestions
+    // Priority 3: State-based default suggestions
     if (!vendorState) {
       return INITIAL_SUGGESTIONS;
     }
@@ -135,7 +146,7 @@ export const SuggestionChips = memo(function SuggestionChips({
     }
 
     return INITIAL_SUGGESTIONS;
-  }, [customSuggestions, vendorState]);
+  }, [customSuggestions, contextualSuggestions, vendorState]);
 
   if (activeSuggestions.length === 0) {
     return null;

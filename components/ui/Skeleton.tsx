@@ -4,6 +4,7 @@
  * Provides loading placeholders with shimmer effects
  */
 
+import React from "react";
 import { cn } from "@/lib/utils";
 
 // =============================================================================

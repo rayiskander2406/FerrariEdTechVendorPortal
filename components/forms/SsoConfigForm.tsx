@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, type FormEvent } from "react";
+import React, { useState, useCallback, type FormEvent } from "react";
 import { z } from "zod";
 import {
   Link2,
+  Link,
   ExternalLink,
   Shield,
   CheckCircle2,
@@ -14,12 +15,19 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  SSO_PROVIDERS,
+  SSO_SCOPES_BY_PROVIDER,
+  SsoProviderEnumWithSchoolDay,
+  type SsoProviderKey,
+} from "@/lib/config/sso";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
-export type SsoProvider = "SCHOOLOGY" | "CLEVER" | "PARENT_PORTAL";
+// Re-export SsoProviderKey as SsoProvider for backwards compatibility
+export type SsoProvider = SsoProviderKey;
 
 export interface SsoConfig {
   provider: SsoProvider;
@@ -43,53 +51,34 @@ interface FormErrors {
 // =============================================================================
 
 const FormSchema = z.object({
-  provider: z.enum(["SCHOOLOGY", "CLEVER", "PARENT_PORTAL"]),
+  provider: SsoProviderEnumWithSchoolDay,
   launchUrl: z.string().url("Please enter a valid URL"),
   redirectUri: z.string().url("Please enter a valid redirect URI"),
   scopes: z.array(z.string()).min(1, "Select at least one scope"),
 });
 
 // =============================================================================
-// PROVIDER CONFIGURATION
+// PROVIDER CONFIGURATION (from centralized config)
 // =============================================================================
 
-const PROVIDERS = [
-  {
-    value: "SCHOOLOGY" as const,
-    label: "Schoology",
-    description: "LAUSD's primary LMS integration",
-    icon: GraduationCap,
-  },
-  {
-    value: "CLEVER" as const,
-    label: "Clever",
-    description: "Single sign-on for K-12",
-    icon: Sparkles,
-  },
-  {
-    value: "PARENT_PORTAL" as const,
-    label: "Parent Portal",
-    description: "Family account access",
-    icon: Users,
-  },
-];
-
-const SCOPES_BY_PROVIDER: Record<SsoProvider, { value: string; label: string; description: string }[]> = {
-  SCHOOLOGY: [
-    { value: "profile", label: "Profile", description: "Basic user profile information" },
-    { value: "roster:read", label: "Roster Read", description: "Read class rosters and enrollments" },
-    { value: "grades:read", label: "Grades Read", description: "Read student grades and assignments" },
-  ],
-  CLEVER: [
-    { value: "read:user", label: "Read User", description: "Basic user information" },
-    { value: "read:students", label: "Read Students", description: "Student roster data" },
-    { value: "read:sections", label: "Read Sections", description: "Class section information" },
-  ],
-  PARENT_PORTAL: [
-    { value: "profile", label: "Profile", description: "Parent/guardian profile" },
-    { value: "family:read", label: "Family Read", description: "Linked student information" },
-  ],
+// Icon mapping for Lucide React components
+const ICON_MAP: Record<string, typeof GraduationCap> = {
+  GraduationCap,
+  Sparkles,
+  Link,
+  Users,
 };
+
+// Build PROVIDERS array from centralized config
+const PROVIDERS = Object.entries(SSO_PROVIDERS).map(([key, provider]) => ({
+  value: key as SsoProviderKey,
+  label: provider.name,
+  description: provider.description,
+  icon: ICON_MAP[provider.icon] ?? Users,
+}));
+
+// Use centralized scopes config
+const SCOPES_BY_PROVIDER = SSO_SCOPES_BY_PROVIDER;
 
 // =============================================================================
 // COMPONENT
@@ -98,10 +87,10 @@ const SCOPES_BY_PROVIDER: Record<SsoProvider, { value: string; label: string; de
 export function SsoConfigForm({ provider: initialProvider, onSubmit, onCancel }: SsoConfigFormProps) {
   // Form state
   const [formData, setFormData] = useState({
-    provider: initialProvider ?? ("SCHOOLOGY" as SsoProvider),
+    provider: initialProvider ?? ("SCHOOLDAY" as SsoProvider),
     launchUrl: "",
     redirectUri: "",
-    scopes: ["profile"] as string[],
+    scopes: ["openid", "profile"] as string[],
   });
 
   const [errors, setErrors] = useState<FormErrors>({});

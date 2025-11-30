@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   Play,
   X,
@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getOneRosterResponse } from "@/lib/data/synthetic";
+import {
+  ONEROSTER_ENDPOINT_METADATA,
+  getEndpointMetadata,
+  type OneRosterEndpoint,
+} from "@/lib/config/oneroster";
 
 // =============================================================================
 // TYPES
@@ -22,7 +27,6 @@ interface ApiTesterProps {
   onClose: () => void;
 }
 
-type Endpoint = "/users" | "/classes" | "/enrollments" | "/orgs";
 type Limit = 10 | 25 | 50;
 
 interface ApiResult {
@@ -34,15 +38,14 @@ interface ApiResult {
 }
 
 // =============================================================================
-// CONSTANTS
+// CONSTANTS (derived from centralized config)
 // =============================================================================
 
-const ENDPOINTS: { value: Endpoint; label: string; description: string }[] = [
-  { value: "/users", label: "Users", description: "Students & Teachers" },
-  { value: "/classes", label: "Classes", description: "Course sections" },
-  { value: "/enrollments", label: "Enrollments", description: "Class rosters" },
-  { value: "/orgs", label: "Orgs", description: "Schools & Districts" },
-];
+/**
+ * Endpoint configuration from single source of truth.
+ * @see lib/config/oneroster.ts
+ */
+const ALL_ENDPOINTS = ONEROSTER_ENDPOINT_METADATA;
 
 const LIMITS: Limit[] = [10, 25, 50];
 
@@ -173,7 +176,7 @@ function highlightJson(json: string): React.ReactNode[] {
 // =============================================================================
 
 export function ApiTester({ onClose }: ApiTesterProps) {
-  const [endpoint, setEndpoint] = useState<Endpoint>("/users");
+  const [endpoint, setEndpoint] = useState<OneRosterEndpoint>("/users");
   const [limit, setLimit] = useState<Limit>(10);
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<ApiResult | null>(null);
@@ -195,12 +198,12 @@ export function ApiTester({ onClose }: ApiTesterProps) {
       const response = getOneRosterResponse(endpoint, undefined, limit, 0);
       const endTime = performance.now();
 
-      // Count records
-      let recordCount = 0;
-      if ("users" in response && response.users) recordCount = response.users.length;
-      if ("classes" in response && response.classes) recordCount = response.classes.length;
-      if ("enrollments" in response && response.enrollments) recordCount = response.enrollments.length;
-      if ("orgs" in response && response.orgs) recordCount = response.orgs.length;
+      // Count records using centralized metadata for response key
+      const metadata = getEndpointMetadata(endpoint);
+      const resp = response as Record<string, unknown[]>;
+      const recordCount = metadata && resp[metadata.responseKey]
+        ? resp[metadata.responseKey].length
+        : 0;
 
       setResult({
         status: 200,
@@ -271,7 +274,7 @@ export function ApiTester({ onClose }: ApiTesterProps) {
 
       {/* Endpoint Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {ENDPOINTS.map((ep) => (
+        {ALL_ENDPOINTS.map((ep) => (
           <button
             key={ep.value}
             onClick={() => setEndpoint(ep.value)}
