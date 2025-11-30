@@ -5,8 +5,8 @@
  * Powers demo data, test fixtures, and storybook.
  */
 
-import { type ZodTypeAny, type ZodObject, type ZodRawShape } from "zod";
-import { getMeta, type SchemaDefinition, extractFields } from "../core";
+import { type ZodRawShape } from "zod";
+import { type SchemaDefinition, extractFields } from "../core";
 
 // =============================================================================
 // SEEDED RANDOM
@@ -32,7 +32,8 @@ class SeededRandom {
   }
 
   pick<T>(array: T[]): T {
-    return array[this.nextInt(0, array.length - 1)];
+    // Index is always valid since we use length - 1 as max
+    return array[this.nextInt(0, array.length - 1)]!;
   }
 }
 
@@ -63,11 +64,13 @@ const LAST_NAMES = [
   "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez",
 ];
 
-const DEPARTMENTS = ["Engineering", "Product", "Sales", "Marketing", "Support"];
+// Reserved for future schema types
+// const DEPARTMENTS = ["Engineering", "Product", "Sales", "Marketing", "Support"];
 
 const DOMAINS = ["edutech.io", "learnsmart.com", "schoolbright.org", "edtools.co"];
 
-const SUBJECTS = ["Mathematics", "Reading", "Science", "History", "Art", "Music", "PE"];
+// Reserved for future schema types
+// const SUBJECTS = ["Mathematics", "Reading", "Science", "History", "Art", "Music", "PE"];
 
 // =============================================================================
 // MOCK GENERATORS
@@ -167,7 +170,8 @@ function generateFieldValue(
         const available = [...field.enumValues];
         for (let i = 0; i < count && available.length > 0; i++) {
           const idx = random.nextInt(0, available.length - 1);
-          selected.push(available[idx]);
+          // Index is always valid since we check available.length > 0
+          selected.push(available[idx]!);
           available.splice(idx, 1);
         }
         return selected;

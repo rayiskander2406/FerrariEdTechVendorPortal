@@ -9,12 +9,10 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import { AI_TOOL_SSO_PROVIDERS } from "@/lib/config/sso";
-import {
-  AI_TOOLS,
-  ALL_TOOL_IDS,
-  type ToolId,
-  type ToolKey,
-} from "@/lib/config/ai-tools";
+import { AI_TOOLS } from "@/lib/config/ai-tools"; // CONFIG-03 centralized config
+
+// AI_TOOLS is exported from centralized config for consistency validation
+export { AI_TOOLS };
 
 // =============================================================================
 // TOOL DEFINITIONS
@@ -75,13 +73,21 @@ The form will be embedded in the chat interface for the vendor to complete.`,
         },
         prefill_vendor_name: {
           type: "string",
-          description:
-            "Optional: Pre-fill the vendor name field if already known",
+          description: `CRITICAL - ALWAYS EXTRACT VENDOR NAME: You MUST scan the conversation for any company/vendor name and pass it here. Look for patterns like:
+- "I'm from [Company]" or "I am from [Company]"
+- "We are [Company]" or "My company is [Company]"
+- "[Company] is interested in..." or "[Company] wants to..."
+- "I represent [Company]" or "On behalf of [Company]"
+
+Examples: "I'm from MathGenius Learning" → prefill_vendor_name: "MathGenius Learning"
+          "ReadWell Education here" → prefill_vendor_name: "ReadWell Education"
+
+This significantly improves user experience by pre-filling the form. ALWAYS extract and pass any vendor name mentioned.`,
         },
         prefill_email: {
           type: "string",
           description:
-            "Optional: Pre-fill the contact email field if already known",
+            "If the vendor has mentioned their email address in the conversation, extract and pass it here to pre-fill the form.",
         },
       },
       required: ["trigger_form"],
@@ -126,17 +132,18 @@ Returns the API key, secret, base URL, and expiration date. Credentials are show
     name: "configure_sso",
     description: `Configure Single Sign-On (SSO) integration with one of LAUSD's supported identity providers.
 
-Supported Providers:
-- CLEVER: Primary SSO for K-8 applications
-- CLASSLINK: Primary SSO for 6-12 applications
-- GOOGLE: Google Workspace SSO for all grade levels
+Supported Providers (use SCHOOLDAY first unless vendor specifically requests another):
+- SCHOOLDAY: LAUSD's unified identity platform - RECOMMENDED DEFAULT for best integration
+- CLEVER: K-8 applications (only if vendor specifically requests Clever)
+- CLASSLINK: 6-12 applications (only if vendor specifically requests ClassLink)
+- GOOGLE: Google Workspace SSO (only if vendor specifically requests Google)
 
 Use this tool when:
 - A vendor needs to set up SSO
 - Configuring OAuth redirect URIs
 - Troubleshooting SSO connection issues
 
-Can either trigger the configuration form or update settings directly if credentials are provided.`,
+IMPORTANT: Always use provider="SCHOOLDAY" unless the vendor explicitly requests a different provider.`,
     input_schema: {
       type: "object" as const,
       properties: {

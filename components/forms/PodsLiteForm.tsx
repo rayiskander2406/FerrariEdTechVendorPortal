@@ -1,14 +1,10 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useId, useRef, type FormEvent, type ChangeEvent, type KeyboardEvent, type ClipboardEvent } from "react";
+import React, { useState, useCallback, useMemo, useId, useRef, useEffect, type FormEvent, type ChangeEvent, type KeyboardEvent, type ClipboardEvent } from "react";
 import { z } from "zod";
 import {
-  Building2,
-  User,
   Mail,
-  Phone,
   MapPin,
-  Package,
   Database,
   Settings,
   Users,
@@ -43,6 +39,7 @@ import {
 import { quickVerificationCheck } from "@/lib/verification";
 import { SchemaFormSection } from "./SchemaFormSection";
 import { PodsLiteSchema, generateFormConfig } from "@/lib/schemas";
+import { dataElementsToEndpoints, DEFAULT_ONEROSTER_ENDPOINTS } from "@/lib/config/oneroster";
 
 // =============================================================================
 // TYPES
@@ -172,7 +169,7 @@ const DATA_ELEMENTS = [
 const SCHEMA_FORM_CONFIG = generateFormConfig(PodsLiteSchema);
 const COMPANY_SECTION = SCHEMA_FORM_CONFIG.sections.find(s => s.id === "company")!;
 const CONTACT_SECTION = SCHEMA_FORM_CONFIG.sections.find(s => s.id === "contact")!;
-const COMPLIANCE_SECTION = SCHEMA_FORM_CONFIG.sections.find(s => s.id === "compliance")!;
+// Compliance section available in SCHEMA_FORM_CONFIG.sections for future use
 
 const INTEGRATION_METHODS = [
   {
@@ -285,6 +282,13 @@ function generateVendorCredentials(
 
   // OneRoster API credentials
   if (selectedIntegrations.includes("ONEROSTER_API")) {
+    // Convert form data elements (USERS, CLASSES, etc.) to OneRoster endpoints (/users, /classes, etc.)
+    console.log("[generateVendorCredentials] formData.dataElementsRequested:", formData.dataElementsRequested);
+    const mappedEndpoints = dataElementsToEndpoints(formData.dataElementsRequested);
+    console.log("[generateVendorCredentials] mappedEndpoints (before fallback):", mappedEndpoints);
+    const endpoints = mappedEndpoints ?? [...DEFAULT_ONEROSTER_ENDPOINTS];
+    console.log("[generateVendorCredentials] final endpoints:", endpoints);
+
     credentials.oneRoster = {
       apiKey: `sk_test_${randomHex(24)}`,
       apiSecret: `sk_secret_${randomHex(32)}`,
@@ -292,7 +296,7 @@ function generateVendorCredentials(
       vendorId,
       accessTier: "PRIVACY_SAFE",
       rateLimitPerMinute: 60,
-      allowedEndpoints: ["/students", "/teachers", "/classes", "/schools", "/enrollments", "/courses", "/orgs", "/academicSessions"],
+      allowedEndpoints: endpoints,
       selectedResources: formData.dataElementsRequested,
     };
   }
@@ -381,6 +385,9 @@ function generateVendorCredentials(
 // =============================================================================
 
 export function PodsLiteForm({ onSubmit, onCancel, onTestApi, prefill }: PodsLiteFormProps) {
+  // DEBUG: Log prefill prop
+  console.log("[PodsLiteForm] Received prefill prop:", prefill);
+
   // Generate demo data once on mount using useMemo
   const demoData = useMemo(() => generateDemoData(), []);
   const formId = useId();
@@ -397,9 +404,10 @@ export function PodsLiteForm({ onSubmit, onCancel, onTestApi, prefill }: PodsLit
   const [applicationNumber] = useState(() => `PODS-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`);
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Form state - pre-filled with demo data for smooth demo experience
+  // Form state - vendor name starts blank, other fields use demo data
+  // NOTE: If prefill is provided (from AI tool), it will be applied via useEffect
   const [formData, setFormData] = useState({
-    vendorName: prefill?.vendorName ?? demoData.vendorName,
+    vendorName: prefill?.vendorName ?? "",  // Start blank, user types their company name
     contactName: demoData.contactName,
     contactEmail: prefill?.contactEmail ?? demoData.contactEmail,
     contactPhone: demoData.contactPhone,
@@ -444,6 +452,21 @@ export function PodsLiteForm({ onSubmit, onCancel, onTestApi, prefill }: PodsLit
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // ==========================================================================
+  // FIX-003: Sync prefill prop changes after mount
+  // useState only uses initial value on first render. If prefill arrives
+  // asynchronously (from AI tool result), we need useEffect to update.
+  // ==========================================================================
+  useEffect(() => {
+    if (prefill?.vendorName && prefill.vendorName !== formData.vendorName) {
+      setFormData(prev => ({ ...prev, vendorName: prefill.vendorName! }));
+    }
+    if (prefill?.contactEmail && prefill.contactEmail !== formData.contactEmail) {
+      setFormData(prev => ({ ...prev, contactEmail: prefill.contactEmail! }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.vendorName, prefill?.contactEmail]);
+
   // Track which integration tab is active in credentials view
   // Will be updated when credentials are generated to match first available tab
   const [activeCredentialTab, setActiveCredentialTab] = useState<string>("");
@@ -453,7 +476,7 @@ export function PodsLiteForm({ onSubmit, onCancel, onTestApi, prefill }: PodsLit
   // ==========================================================================
 
   const handleInputChange = useCallback(
-    (field: string, value: string | number | boolean | string[] | undefined) => {
+    (field: string, value: unknown) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
       // Clear error when field is edited
       setErrors((prev) => {
@@ -639,8 +662,9 @@ export function PodsLiteForm({ onSubmit, onCancel, onTestApi, prefill }: PodsLit
           acceptsDataDeletion: formData.acceptsDataDeletion,
         };
         await onSubmit(podsInput);
-      } catch {
-        // Silently handle
+      } catch (err) {
+        // Log error for debugging but don't block user flow
+        console.error("[PodsLiteForm] onSubmit failed:", err);
       }
     } else {
       setCodeError("Invalid verification code. Please try again.");

@@ -151,6 +151,13 @@ export async function POST(request: NextRequest) {
 
     const { messages, vendorContext } = body;
 
+    console.log("[API/chat] Received vendorContext:", {
+      hasContext: !!vendorContext,
+      vendorId: vendorContext?.vendor?.id,
+      vendorName: vendorContext?.vendor?.name,
+      podsStatus: vendorContext?.vendor?.podsStatus,
+    });
+
     // Validate messages
     if (!messages) {
       throw new ValidationError("Messages field is required", "messages");

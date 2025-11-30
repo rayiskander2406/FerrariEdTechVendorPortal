@@ -5,11 +5,9 @@
  * Powers dynamic form rendering from schema definitions.
  */
 
-import { type ZodTypeAny, type ZodObject, type ZodRawShape } from "zod";
+import { type ZodRawShape } from "zod";
 import {
-  getMeta,
   type SchemaDefinition,
-  type SchemaSection,
   extractFields,
   type ExtractedField,
   type FieldMeta,

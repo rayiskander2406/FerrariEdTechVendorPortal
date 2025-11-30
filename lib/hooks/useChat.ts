@@ -38,6 +38,7 @@ export interface ToolCallInfo {
     showForm?: string;
     message?: string;
     hasData?: boolean;
+    data?: Record<string, unknown>;
   };
 }
 
@@ -55,6 +56,7 @@ export interface UseChatReturn {
   messages: ChatMessage[];
   isLoading: boolean;
   activeForm: string | null;
+  formData: Record<string, unknown> | null;
   vendorState: VendorState;
   error: string | null;
   suggestedResponses: string[];
@@ -91,6 +93,7 @@ export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeForm, setActiveFormState] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Record<string, unknown> | null>(null);
   const [vendorState, setVendorState] = useState<VendorState>(INITIAL_VENDOR_STATE);
   const [error, setError] = useState<string | null>(null);
   const [suggestedResponses, setSuggestedResponses] = useState<string[]>([]);
@@ -98,11 +101,13 @@ export function useChat(): UseChatReturn {
   // Refs
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // CRITICAL: Use ref for isLoading to avoid stale closure issues in sendMessage
-  // The ref is updated synchronously so it always reflects the current state
+  // CRITICAL: Use refs for isLoading and vendorState to avoid stale closure issues
+  // The refs are updated synchronously so they always reflect the current state
   const isLoadingRef = useRef(isLoading);
-  // Update ref synchronously during render (not in useEffect) to avoid timing gaps
+  const vendorStateRef = useRef(vendorState);
+  // Update refs synchronously during render (not in useEffect) to avoid timing gaps
   isLoadingRef.current = isLoading;
+  vendorStateRef.current = vendorState;
 
   // ==========================================================================
   // UTILITY FUNCTIONS
@@ -142,31 +147,43 @@ export function useChat(): UseChatReturn {
 
   /**
    * Build vendor context for API request
+   * CRITICAL: Uses vendorStateRef.current to always get the latest state,
+   * avoiding stale closure issues when called from sendMessage
    */
   const buildVendorContext = useCallback((): VendorContext | undefined => {
-    if (!vendorState.vendorId) {
+    // Use ref to get current state, not closure value
+    const currentVendorState = vendorStateRef.current;
+
+    console.log("[buildVendorContext] vendorState:", {
+      vendorId: currentVendorState.vendorId,
+      companyName: currentVendorState.companyName,
+      podsStatus: currentVendorState.podsStatus,
+      isOnboarded: currentVendorState.isOnboarded,
+    });
+    if (!currentVendorState.vendorId) {
+      console.log("[buildVendorContext] No vendorId, returning undefined");
       return undefined;
     }
 
     return {
-      vendor: vendorState.vendorId
+      vendor: currentVendorState.vendorId
         ? {
-            id: vendorState.vendorId,
-            name: vendorState.companyName ?? "Unknown",
+            id: currentVendorState.vendorId,
+            name: currentVendorState.companyName ?? "Unknown",
             contactEmail: "", // Would be populated from actual vendor data
             contactName: "",
-            accessTier: vendorState.accessTier ?? "PRIVACY_SAFE",
-            podsStatus: (vendorState.podsStatus as "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED") ?? "NOT_STARTED",
+            accessTier: currentVendorState.accessTier ?? "PRIVACY_SAFE",
+            podsStatus: (currentVendorState.podsStatus as "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED") ?? "NOT_STARTED",
             createdAt: new Date(),
             updatedAt: new Date(),
           }
         : undefined,
-      sandboxCredentials: vendorState.credentials ?? undefined,
-      integrations: vendorState.integrations,
+      sandboxCredentials: currentVendorState.credentials ?? undefined,
+      integrations: currentVendorState.integrations,
       sessionId: `session_${Date.now()}`,
       lastActivity: new Date(),
     };
-  }, [vendorState]);
+  }, []); // No dependencies needed since we use ref
 
   // ==========================================================================
   // MAIN FUNCTIONS
@@ -269,6 +286,7 @@ export function useChat(): UseChatReturn {
         const decoder = new TextDecoder();
         let accumulatedContent = "";
         let currentToolCalls: ToolCallInfo[] = [];
+        let toolResultTriggeredForm = false; // Track if tool result already triggered a form
 
         while (true) {
           const { done, value } = await reader.read();
@@ -366,6 +384,11 @@ export function useChat(): UseChatReturn {
                     // Check if tool result triggers a form
                     if (parsed.result.showForm) {
                       setActiveFormState(parsed.result.showForm);
+                      toolResultTriggeredForm = true; // Mark that tool triggered the form
+                      // Capture form data (including prefill) from tool result
+                      if (parsed.result.data) {
+                        setFormData(parsed.result.data as Record<string, unknown>);
+                      }
                     }
                   }
                   break;
@@ -396,10 +419,13 @@ export function useChat(): UseChatReturn {
           )
         );
 
-        // Check for form triggers in final content
+        // Check for form triggers in final content (text markers like [FORM:PODS_LITE])
+        // NOTE: Only process text markers if tool result didn't already trigger a form
+        // This prevents clearing formData that was just set by a tool result
         const formTrigger = detectFormTriggers(accumulatedContent);
-        if (formTrigger) {
+        if (formTrigger && !toolResultTriggeredForm) {
           setActiveFormState(formTrigger);
+          setFormData(null); // Clear stale formData - text markers don't provide prefill data
         }
 
         // Extract and set suggested responses
@@ -510,6 +536,7 @@ export function useChat(): UseChatReturn {
     messages,
     isLoading,
     activeForm,
+    formData,
     vendorState,
     error,
     suggestedResponses,

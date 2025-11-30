@@ -288,5 +288,5 @@ export function extractFormTriggers(content: string): FormId[] {
  */
 export function getLastFormTrigger(content: string): FormId | null {
   const triggers = extractFormTriggers(content);
-  return triggers.length > 0 ? triggers[triggers.length - 1] : null;
+  return triggers.length > 0 ? (triggers[triggers.length - 1] ?? null) : null;
 }

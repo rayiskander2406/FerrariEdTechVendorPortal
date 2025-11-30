@@ -250,8 +250,9 @@ function getZodTypeName(schema: ZodTypeAny): string {
  * Get default value from a Zod schema
  */
 function getDefaultValue(schema: ZodTypeAny): unknown {
-  if (schema._def.typeName === "ZodDefault") {
-    return schema._def.defaultValue();
+  const def = schema._def as { typeName?: string; defaultValue?: () => unknown };
+  if (def.typeName === "ZodDefault" && def.defaultValue) {
+    return def.defaultValue();
   }
   return undefined;
 }
@@ -282,7 +283,7 @@ function getEnumValues(schema: ZodTypeAny): string[] | undefined {
   // Check if it's an array with enum items
   if (typeName === "ZodArray") {
     // Zod v4.x uses _def.element instead of _def.type
-    const def = current._def as { element?: ZodTypeAny; type?: ZodTypeAny };
+    const def = current._def as unknown as { element?: ZodTypeAny; type?: ZodTypeAny };
     const itemType = def.element || def.type;
     if (itemType?.constructor.name === "ZodEnum") {
       // Zod v4.x uses options property instead of _def.values

@@ -59,9 +59,93 @@ export const ONEROSTER_RESOURCE_TO_ENDPOINT: Record<string, OneRosterEndpoint> =
   organizations: "/orgs",
   academicSessions: "/academicSessions",
   academicsessions: "/academicSessions",
+  academic_sessions: "/academicSessions", // Form uses ACADEMIC_SESSIONS -> academic_sessions
   sessions: "/academicSessions",
   demographics: "/demographics",
 };
+
+// =============================================================================
+// DATA ELEMENT TO ENDPOINT MAPPING
+// =============================================================================
+
+/**
+ * Maps DataElementEnum values (PII field types) to OneRoster endpoints.
+ * This bridges the semantic gap between "what data do you need?" (form)
+ * and "which API endpoints should you access?" (sandbox).
+ *
+ * @see lib/types/index.ts DataElementEnum for valid input values
+ * @see BUG: OneRoster entities mismatch - form collects DataElements, but
+ *           resourcesToEndpoints() expected resource names like "users", "classes"
+ */
+export const DATA_ELEMENT_TO_ENDPOINTS: Record<string, OneRosterEndpoint[]> = {
+  // ==========================================================================
+  // FORM VALUE MAPPINGS (FIX-001 + FIX-006)
+  // These match the values sent by PodsLiteForm DATA_ELEMENTS
+  // ==========================================================================
+  USERS: ["/users"],
+  CLASSES: ["/classes"],
+  COURSES: ["/courses"],
+  ENROLLMENTS: ["/enrollments"],
+  ORGS: ["/orgs"],
+  ACADEMIC_SESSIONS: ["/academicSessions"],
+  // Note: DEMOGRAPHICS is already mapped below
+
+  // ==========================================================================
+  // LEGACY DataElementEnum MAPPINGS (preserved for backwards compatibility)
+  // These are the original PII field type → endpoint mappings
+  // ==========================================================================
+
+  // User-related data elements → /users endpoint
+  STUDENT_ID: ["/users"],
+  FIRST_NAME: ["/users"],
+  LAST_NAME: ["/users"],
+  EMAIL: ["/users"],
+  TEACHER_ID: ["/users"],
+  PHONE: ["/users"],
+  ADDRESS: ["/users"],
+
+  // Organization data → /orgs endpoint
+  SCHOOL_ID: ["/orgs"],
+
+  // Grade and class data
+  GRADE_LEVEL: ["/users"],
+  CLASS_ROSTER: ["/classes", "/enrollments", "/courses"],
+
+  // Demographics → /demographics endpoint
+  DEMOGRAPHICS: ["/demographics"],
+  SPECIAL_ED: ["/demographics"],
+
+  // These don't have direct OneRoster equivalents, but need user access
+  ATTENDANCE: ["/users", "/classes"],
+  GRADES: ["/users", "/classes"],
+};
+
+/**
+ * Converts DataElement enum values to OneRoster endpoint paths.
+ * Used by PodsLiteForm submission to determine which endpoints to provision.
+ *
+ * @param dataElements - Array of DataElementEnum values (e.g., ["STUDENT_ID", "CLASS_ROSTER"])
+ * @returns Array of unique OneRoster endpoints, or undefined if no valid mappings
+ */
+export function dataElementsToEndpoints(dataElements?: string[]): OneRosterEndpoint[] | undefined {
+  if (!dataElements || dataElements.length === 0) {
+    return undefined;
+  }
+
+  const endpointsSet = new Set<OneRosterEndpoint>();
+
+  for (const element of dataElements) {
+    const endpoints = DATA_ELEMENT_TO_ENDPOINTS[element];
+    if (endpoints) {
+      for (const ep of endpoints) {
+        endpointsSet.add(ep);
+      }
+    }
+  }
+
+  const result = Array.from(endpointsSet);
+  return result.length > 0 ? result : undefined;
+}
 
 // =============================================================================
 // UI METADATA
@@ -163,9 +247,9 @@ export function validateEndpoints(requestedEndpoints?: string[]): OneRosterEndpo
     .map(normalizeEndpoint)
     .filter((ep): ep is OneRosterEndpoint => ep !== undefined);
 
-  const unique = [...new Set(validated)];
+  const unique = Array.from(new Set(validated));
 
-  return unique.length > 0 ? unique : [...DEFAULT_ONEROSTER_ENDPOINTS];
+  return unique.length > 0 ? unique : Array.from(DEFAULT_ONEROSTER_ENDPOINTS);
 }
 
 /**

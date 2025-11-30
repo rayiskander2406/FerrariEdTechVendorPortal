@@ -25,6 +25,7 @@ import {
 
 interface ApiTesterProps {
   onClose: () => void;
+  allowedEndpoints?: string[];
 }
 
 type Limit = 10 | 25 | 50;
@@ -175,8 +176,22 @@ function highlightJson(json: string): React.ReactNode[] {
 // COMPONENT
 // =============================================================================
 
-export function ApiTester({ onClose }: ApiTesterProps) {
-  const [endpoint, setEndpoint] = useState<OneRosterEndpoint>("/users");
+export function ApiTester({ onClose, allowedEndpoints }: ApiTesterProps) {
+  // DEBUG: Log what we receive
+  console.log("[ApiTester] allowedEndpoints prop:", allowedEndpoints);
+
+  // Filter endpoints based on allowed list (if provided)
+  const availableEndpoints = allowedEndpoints && allowedEndpoints.length > 0
+    ? ALL_ENDPOINTS.filter((ep) => allowedEndpoints.includes(ep.value))
+    : ALL_ENDPOINTS;
+
+  // DEBUG: Log filtered result
+  console.log("[ApiTester] availableEndpoints:", availableEndpoints.map(ep => ep.value));
+
+  // Default to first available endpoint
+  const defaultEndpoint = availableEndpoints[0]?.value ?? "/users";
+
+  const [endpoint, setEndpoint] = useState<OneRosterEndpoint>(defaultEndpoint as OneRosterEndpoint);
   const [limit, setLimit] = useState<Limit>(10);
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<ApiResult | null>(null);
@@ -201,9 +216,8 @@ export function ApiTester({ onClose }: ApiTesterProps) {
       // Count records using centralized metadata for response key
       const metadata = getEndpointMetadata(endpoint);
       const resp = response as Record<string, unknown[]>;
-      const recordCount = metadata && resp[metadata.responseKey]
-        ? resp[metadata.responseKey].length
-        : 0;
+      const responseArray = metadata ? resp[metadata.responseKey] : undefined;
+      const recordCount = responseArray?.length ?? 0;
 
       setResult({
         status: 200,
@@ -274,7 +288,7 @@ export function ApiTester({ onClose }: ApiTesterProps) {
 
       {/* Endpoint Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {ALL_ENDPOINTS.map((ep) => (
+        {availableEndpoints.map((ep) => (
           <button
             key={ep.value}
             onClick={() => setEndpoint(ep.value)}

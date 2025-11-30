@@ -141,10 +141,11 @@ export const SsoProviderEnumWithSchoolDay = z.enum([
 ]);
 
 /**
- * AI Tool provider enum values - excludes SCHOOLDAY
+ * AI Tool provider enum values - SCHOOLDAY first as recommended default
  * Use this for configure_sso tool schema
  */
-export const AI_TOOL_SSO_PROVIDERS: readonly ["CLEVER", "CLASSLINK", "GOOGLE"] = [
+export const AI_TOOL_SSO_PROVIDERS: readonly ["SCHOOLDAY", "CLEVER", "CLASSLINK", "GOOGLE"] = [
+  "SCHOOLDAY",
   "CLEVER",
   "CLASSLINK",
   "GOOGLE",

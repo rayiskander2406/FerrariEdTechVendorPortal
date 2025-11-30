@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect, type FormEvent } from "react";
+import React, { useState, useCallback, useMemo, type FormEvent } from "react";
 import { z } from "zod";
 import {
   Mail,
@@ -28,7 +28,6 @@ import {
   DELIVERY_SIMULATION,
   LAUSD_SCALE,
   PRIVACY_BADGES,
-  calculateMessageCost,
   formatCurrency,
   generateMessageId,
   type CpaasChannelId,

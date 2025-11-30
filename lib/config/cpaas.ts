@@ -229,7 +229,7 @@ export function getPriceForVolume(
       monthlyVolume >= t.minVolume &&
       (t.maxVolume === null || monthlyVolume <= t.maxVolume)
   );
-  return tier?.pricePerUnit ?? tiers[0].pricePerUnit;
+  return tier?.pricePerUnit ?? tiers[0]?.pricePerUnit ?? 0;
 }
 
 /**

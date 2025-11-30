@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { Send, CheckCircle2, Loader2, AlertCircle, X, Settings, Play } from "lucide-react";
+import { Send, CheckCircle2, Loader2, AlertCircle, X, Settings, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/lib/hooks/useChat";
@@ -21,8 +21,108 @@ import { AppSubmitForm, type AppSubmission } from "@/components/forms/AppSubmitF
 import { CredentialsDisplay } from "@/components/dashboard/CredentialsDisplay";
 import { AuditLogViewer } from "@/components/dashboard/AuditLogViewer";
 
-// DB functions
-import { createVendor, createSandbox, logAuditEvent, getAuditLogs } from "@/lib/db";
+// DB functions (only for audit logs which don't need server persistence)
+import { logAuditEvent, getAuditLogs } from "@/lib/db";
+
+// Config - for converting data elements to endpoints
+import { dataElementsToEndpoints } from "@/lib/config/oneroster";
+
+// =============================================================================
+// API HELPERS - Server-side persistence to fix client/server memory isolation
+// =============================================================================
+
+/**
+ * Create vendor via API (server-side storage)
+ * CRITICAL: This ensures the vendor is stored in server memory where AI tools can access it
+ */
+async function createVendorViaApi(podsLiteInput: PodsLiteInput, accessTier: string = "PRIVACY_SAFE"): Promise<{
+  id: string;
+  name: string;
+  contactEmail: string;
+  accessTier: string;
+  podsStatus: string;
+  podsApplicationId?: string;
+}> {
+  const response = await fetch("/api/vendors", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ podsLiteInput, accessTier }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error((errorData as { error?: string }).error ?? "Failed to create vendor");
+  }
+
+  const data = await response.json();
+  console.log("[createVendorViaApi] Created vendor:", data.vendor.id);
+  return data.vendor;
+}
+
+/**
+ * Create sandbox credentials via API (server-side storage)
+ * CRITICAL: This ensures credentials are stored in server memory where AI tools can access them
+ */
+async function createSandboxViaApi(vendorId: string, requestedEndpoints?: string[]): Promise<{
+  id: string;
+  vendorId: string;
+  apiKey: string;
+  apiSecret: string;
+  baseUrl: string;
+  environment: string;
+  status: string;
+  expiresAt: string;
+  rateLimitPerMinute: number;
+  allowedEndpoints: string[];
+}> {
+  const response = await fetch("/api/sandbox/credentials", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ vendorId, requestedEndpoints }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error((errorData as { error?: string }).error ?? "Failed to create sandbox");
+  }
+
+  const data = await response.json();
+  console.log("[createSandboxViaApi] Created sandbox:", data.sandbox.id, "with endpoints:", data.sandbox.allowedEndpoints);
+  return data.sandbox;
+}
+
+/**
+ * Persist PoDS application to server-side store
+ */
+async function persistPodsApplication(data: {
+  id: string;
+  vendorName: string;
+  applicationName: string;
+  contactEmail: string;
+  status: string;
+  accessTier: string;
+  submittedAt: Date;
+  reviewedAt: Date;
+  expiresAt: Date;
+}): Promise<void> {
+  try {
+    const response = await fetch("/api/pods", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        submittedAt: data.submittedAt.toISOString(),
+        reviewedAt: data.reviewedAt.toISOString(),
+        expiresAt: data.expiresAt.toISOString(),
+      }),
+    });
+    if (!response.ok) {
+      console.error("[persistPodsApplication] Failed to persist:", await response.text());
+    }
+  } catch (err) {
+    console.error("[persistPodsApplication] Error:", err);
+  }
+}
 
 // Types
 import type { PodsLiteInput, AuditLog } from "@/lib/types";
@@ -37,12 +137,14 @@ export default function ChatPage() {
     messages,
     isLoading,
     activeForm,
+    formData,
     vendorState,
     error,
     suggestedResponses,
     sendMessage,
     setActiveForm,
     updateVendorState,
+    clearChat,
     clearError,
   } = useChat();
 
@@ -101,6 +203,81 @@ export default function ChatPage() {
   }, [error, toast]);
 
   // ==========================================================================
+  // RESTORE PoDS DATA FROM LOCALSTORAGE (survives server restarts)
+  // ==========================================================================
+
+  useEffect(() => {
+    const restorePodsFromLocalStorage = async () => {
+      try {
+        const backup = localStorage.getItem("schoolday_pods_backup");
+        if (!backup) return;
+
+        const backupList = JSON.parse(backup);
+        if (!Array.isArray(backupList) || backupList.length === 0) return;
+
+        console.log(`[Chat] Restoring ${backupList.length} PoDS application(s) from localStorage`);
+
+        // Re-persist each PoDS application to the server
+        // Also restore vendorState for the most recent approved vendor
+        let mostRecentApproved: typeof backupList[0] | null = null;
+
+        for (const podsData of backupList) {
+          try {
+            await persistPodsApplication({
+              ...podsData,
+              submittedAt: new Date(podsData.submittedAt),
+              reviewedAt: new Date(podsData.reviewedAt),
+              expiresAt: new Date(podsData.expiresAt),
+            });
+            console.log(`[Chat] Restored PoDS for: ${podsData.vendorName}`);
+
+            // Track the most recent approved vendor for vendorState
+            if (podsData.status === "APPROVED") {
+              mostRecentApproved = podsData;
+            }
+          } catch (err) {
+            console.warn(`[Chat] Failed to restore PoDS for ${podsData.vendorName}:`, err);
+          }
+        }
+
+        // Also restore vendorState from localStorage if available
+        const savedVendorState = localStorage.getItem("schoolday_vendor_state");
+        if (savedVendorState) {
+          try {
+            const parsed = JSON.parse(savedVendorState);
+            console.log("[Chat] Restoring vendorState from localStorage:", parsed);
+            updateVendorState({
+              isOnboarded: parsed.isOnboarded ?? false,
+              vendorId: parsed.vendorId ?? null,
+              companyName: parsed.companyName ?? null,
+              accessTier: parsed.accessTier ?? null,
+              podsStatus: parsed.podsStatus ?? null,
+              credentials: parsed.credentials ?? null,
+              integrations: parsed.integrations ?? [],
+            });
+          } catch (parseErr) {
+            console.warn("[Chat] Failed to parse saved vendorState:", parseErr);
+          }
+        } else if (mostRecentApproved) {
+          // Fallback: create vendorState from restored PoDS data
+          console.log("[Chat] Creating vendorState from restored PoDS:", mostRecentApproved.vendorName);
+          updateVendorState({
+            isOnboarded: true,
+            vendorId: mostRecentApproved.id || `restored_${Date.now()}`,
+            companyName: mostRecentApproved.vendorName,
+            accessTier: (mostRecentApproved.accessTier as "PRIVACY_SAFE" | "SELECTIVE" | "FULL_ACCESS") ?? "PRIVACY_SAFE",
+            podsStatus: mostRecentApproved.status,
+          });
+        }
+      } catch (err) {
+        console.warn("[Chat] Failed to restore from localStorage:", err);
+      }
+    };
+
+    restorePodsFromLocalStorage();
+  }, [updateVendorState]); // Run once on mount
+
+  // ==========================================================================
   // HELPER: Add system message to chat
   // ==========================================================================
 
@@ -123,21 +300,111 @@ export default function ChatPage() {
   const handlePodsLiteSubmit = useCallback(
     async (data: PodsLiteInput) => {
       try {
-        // Create vendor
-        const vendor = await createVendor({ podsLiteInput: data });
+        // =====================================================================
+        // CRITICAL: All operations go through API routes to ensure server-side
+        // storage. This fixes the client/server memory isolation issue where
+        // data created in browser couldn't be found by AI tool handlers.
+        // =====================================================================
 
-        // Create sandbox credentials
-        const creds = await createSandbox(vendor.id);
+        // Create vendor via API (server-side storage)
+        const vendor = await createVendorViaApi(data, "PRIVACY_SAFE");
+
+        // Convert selected data elements (e.g., "STUDENT_ID", "CLASS_ROSTER") to endpoint paths
+        // NOTE: dataElementsRequested contains DataElementEnum values, NOT resource names
+        // Use dataElementsToEndpoints() to map PII field types → API endpoints
+        const requestedEndpoints = dataElementsToEndpoints(data.dataElementsRequested);
+
+        // DEBUG: Log endpoint mapping
+        console.log("[handlePodsLiteSubmit] dataElementsRequested:", data.dataElementsRequested);
+        console.log("[handlePodsLiteSubmit] requestedEndpoints (after mapping):", requestedEndpoints);
+
+        // Create sandbox credentials via API (server-side storage)
+        const creds = await createSandboxViaApi(vendor.id, requestedEndpoints);
+
+        // DEBUG: Log credentials with endpoints
+        console.log("[handlePodsLiteSubmit] creds.allowedEndpoints:", creds.allowedEndpoints);
+
+        // Persist to server-side PoDS database so lookup_pods can find it
+        const podsId = `PODS-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`;
+        const now = new Date();
+        const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+        const podsData = {
+          id: podsId,
+          vendorName: data.vendorName,
+          applicationName: data.applicationName || data.vendorName,
+          contactEmail: data.contactEmail,
+          status: "APPROVED",
+          accessTier: "PRIVACY_SAFE",
+          submittedAt: now,
+          reviewedAt: now,
+          expiresAt: oneYearFromNow,
+        };
+
+        await persistPodsApplication(podsData);
+
+        // Backup to localStorage so data survives server restarts
+        try {
+          const existingBackup = localStorage.getItem("schoolday_pods_backup");
+          const backupList = existingBackup ? JSON.parse(existingBackup) : [];
+          // Add or update this vendor's PoDS data
+          const existingIndex = backupList.findIndex(
+            (p: { vendorName: string }) => p.vendorName.toLowerCase() === data.vendorName.toLowerCase()
+          );
+          if (existingIndex >= 0) {
+            backupList[existingIndex] = {
+              ...podsData,
+              submittedAt: now.toISOString(),
+              reviewedAt: now.toISOString(),
+              expiresAt: oneYearFromNow.toISOString(),
+            };
+          } else {
+            backupList.push({
+              ...podsData,
+              submittedAt: now.toISOString(),
+              reviewedAt: now.toISOString(),
+              expiresAt: oneYearFromNow.toISOString(),
+            });
+          }
+          localStorage.setItem("schoolday_pods_backup", JSON.stringify(backupList));
+          console.log("[handlePodsLiteSubmit] Saved PoDS backup to localStorage");
+        } catch (lsErr) {
+          console.warn("[handlePodsLiteSubmit] Failed to backup to localStorage:", lsErr);
+        }
+
+        // Convert API response to SandboxCredentials format for vendorState
+        const credsForState = {
+          id: creds.id,
+          vendorId: creds.vendorId,
+          apiKey: creds.apiKey,
+          apiSecret: creds.apiSecret,
+          baseUrl: creds.baseUrl,
+          environment: creds.environment as "sandbox" | "production",
+          status: creds.status as "PROVISIONING" | "ACTIVE" | "EXPIRED" | "REVOKED",
+          expiresAt: new Date(creds.expiresAt),
+          createdAt: new Date(),
+          rateLimitPerMinute: creds.rateLimitPerMinute,
+          allowedEndpoints: creds.allowedEndpoints,
+        };
 
         // Update vendor state (but don't change activeForm - let PodsLiteForm handle its own flow)
-        updateVendorState({
+        const newVendorState = {
           isOnboarded: true,
           vendorId: vendor.id,
           companyName: data.vendorName,
-          accessTier: vendor.accessTier,
+          accessTier: vendor.accessTier as "PRIVACY_SAFE" | "SELECTIVE" | "FULL_ACCESS",
           podsStatus: vendor.podsStatus,
-          credentials: creds,
-        });
+          credentials: credsForState,
+        };
+        updateVendorState(newVendorState);
+
+        // Also save vendorState to localStorage for persistence across page reloads
+        try {
+          localStorage.setItem("schoolday_vendor_state", JSON.stringify(newVendorState));
+          console.log("[handlePodsLiteSubmit] Saved vendorState to localStorage");
+        } catch (lsErr) {
+          console.warn("[handlePodsLiteSubmit] Failed to save vendorState to localStorage:", lsErr);
+        }
 
         // NOTE: Removed setActiveForm("credentials") - PodsLiteForm now handles
         // its own internal step progression: form → verification → submitted → credentials
@@ -400,6 +667,21 @@ export default function ChatPage() {
     setActiveForm(null);
   }, [setActiveForm]);
 
+  /**
+   * Handle reset - clears localStorage and reloads the page
+   */
+  const handleReset = useCallback(() => {
+    // Clear all SchoolDay-related localStorage
+    localStorage.removeItem("schoolday_pods_backup");
+    localStorage.removeItem("schoolday_vendor_state");
+
+    // Clear chat state
+    clearChat();
+
+    // Reload the page to reset server-side state as well
+    window.location.reload();
+  }, [clearChat]);
+
   // ==========================================================================
   // RENDER FORM
   // ==========================================================================
@@ -407,15 +689,21 @@ export default function ChatPage() {
   const renderForm = () => {
     switch (activeForm) {
       case "pods_lite":
+        // Get prefill from formData (AI tool result) or vendorState
+        console.log("[page.tsx renderForm] formData:", formData);
+        const podsPrefill = formData?.prefill as { vendorName?: string; contactEmail?: string } | undefined;
+        console.log("[page.tsx renderForm] podsPrefill:", podsPrefill);
         return (
           <PodsLiteForm
             onSubmit={handlePodsLiteSubmit}
             onCancel={handleCloseForm}
             onTestApi={() => setActiveForm("api_tester")}
             prefill={
-              vendorState.companyName
-                ? { vendorName: vendorState.companyName }
-                : undefined
+              podsPrefill?.vendorName
+                ? podsPrefill
+                : vendorState.companyName
+                  ? { vendorName: vendorState.companyName }
+                  : undefined
             }
           />
         );
@@ -437,7 +725,12 @@ export default function ChatPage() {
         );
 
       case "api_tester":
-        return <ApiTester onClose={handleCloseForm} />;
+        return (
+          <ApiTester
+            onClose={handleCloseForm}
+            allowedEndpoints={vendorState.credentials?.allowedEndpoints}
+          />
+        );
 
       case "comm_test":
         return (
@@ -538,15 +831,15 @@ export default function ChatPage() {
                 <span className="text-[10px] sm:text-xs font-medium text-success-700">AI Online</span>
               </div>
 
-              {/* Demo Guide Link */}
-              <Link
-                href="/demo"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-primary to-purple-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
-                title="Demo Walkthrough Guide"
+              {/* Reset Button */}
+              <button
+                onClick={handleReset}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
+                title="Reset session and clear all data"
               >
-                <Play className="w-3.5 h-3.5" />
-                Demo
-              </Link>
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset
+              </button>
 
               {/* Feature Flags Dashboard Link */}
               <Link

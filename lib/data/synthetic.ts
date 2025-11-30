@@ -91,11 +91,55 @@ export interface PodsApplication {
   expiresAt: Date | null;
 }
 
+export interface OneRosterCourse {
+  sourcedId: string;
+  status: "active";
+  dateLastModified: string;
+  title: string;
+  courseCode: string;
+  grades: string[];
+  subjects: string[];
+  org: { sourcedId: string };
+}
+
+export interface OneRosterAcademicSession {
+  sourcedId: string;
+  status: "active";
+  dateLastModified: string;
+  title: string;
+  type: "term" | "schoolYear";
+  startDate: string;
+  endDate: string;
+  schoolYear: string;
+}
+
+export interface OneRosterDemographic {
+  sourcedId: string;
+  status: "active";
+  dateLastModified: string;
+  birthDate: string;
+  sex: string;
+  americanIndianOrAlaskaNative: boolean;
+  asian: boolean;
+  blackOrAfricanAmerican: boolean;
+  hispanicOrLatinoEthnicity: boolean;
+  nativeHawaiianOrOtherPacificIslander: boolean;
+  white: boolean;
+  demographicRaceTwoOrMoreRaces: boolean;
+  countryOfBirthCode: string;
+  stateOfBirthAbbreviation: string;
+  cityOfBirth: string;
+  publicSchoolResidenceStatus: string;
+}
+
 export interface OneRosterResponse {
   users?: OneRosterUser[];
   orgs?: OneRosterOrg[];
   classes?: OneRosterClass[];
   enrollments?: OneRosterEnrollment[];
+  courses?: OneRosterCourse[];
+  academicSessions?: OneRosterAcademicSession[];
+  demographics?: OneRosterDemographic[];
   statusInfoSet?: { imsx_codeMajor: string; imsx_severity: string; imsx_description: string };
 }
 
@@ -687,7 +731,7 @@ export function getOneRosterResponse(
 
     case "/courses": {
       // Generate courses from unique class subjects
-      const subjects = [...new Set(data.classes.map((c) => c.subject))];
+      const subjects = Array.from(new Set(data.classes.map((c) => c.subject)));
       const courses = subjects.map((subject, idx) => ({
         sourcedId: `CRS_${subject.toUpperCase().replace(/\s+/g, "_")}_${idx}`,
         status: "active" as const,
@@ -800,11 +844,48 @@ export function getOneRosterResponse(
 }
 
 // =============================================================================
-// MOCK PODS DATABASE
+// MOCK PODS DATABASE (with session persistence)
 // =============================================================================
 
+// Session store for new PoDS submissions (persists during server runtime)
+let _sessionPodsSubmissions: PodsApplication[] = [];
+
 /**
- * Get mock PoDS applications database with 5 existing records
+ * Add a new PoDS application to the session store
+ */
+export function addPodsApplication(application: PodsApplication): void {
+  // Check if already exists (by id or vendor name)
+  const existingIndex = _sessionPodsSubmissions.findIndex(
+    (p) => p.id === application.id ||
+           (p.vendorName.toLowerCase() === application.vendorName.toLowerCase() &&
+            p.applicationName.toLowerCase() === application.applicationName.toLowerCase())
+  );
+
+  if (existingIndex >= 0) {
+    // Update existing
+    _sessionPodsSubmissions[existingIndex] = application;
+  } else {
+    // Add new
+    _sessionPodsSubmissions.push(application);
+  }
+}
+
+/**
+ * Get all session PoDS submissions
+ */
+export function getSessionPodsSubmissions(): PodsApplication[] {
+  return _sessionPodsSubmissions;
+}
+
+/**
+ * Clear session PoDS submissions (for testing)
+ */
+export function clearSessionPodsSubmissions(): void {
+  _sessionPodsSubmissions = [];
+}
+
+/**
+ * Get mock PoDS applications database with 5 existing records + session submissions
  */
 export function getMockPodsDatabase(): PodsApplication[] {
   const now = new Date();
@@ -813,7 +894,7 @@ export function getMockPodsDatabase(): PodsApplication[] {
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-  return [
+  const staticRecords: PodsApplication[] = [
     {
       id: "PODS-2024-001",
       vendorName: "MathWhiz Learning",
@@ -870,6 +951,9 @@ export function getMockPodsDatabase(): PodsApplication[] {
       expiresAt: null,
     },
   ];
+
+  // Return static records + session submissions (session submissions take precedence)
+  return [...staticRecords, ..._sessionPodsSubmissions];
 }
 
 // =============================================================================

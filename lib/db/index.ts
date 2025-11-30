@@ -23,12 +23,29 @@ import { validateEndpoints } from "@/lib/config/oneroster";
 const USE_MOCK_DB = process.env.USE_MOCK_DB !== "false";
 
 // =============================================================================
-// IN-MEMORY STORES
+// IN-MEMORY STORES (Using globalThis for persistence across Next.js hot reloads)
 // =============================================================================
 
-const vendorStore = new Map<string, Vendor>();
-const sandboxStore = new Map<string, SandboxCredentials>();
-const auditStore: AuditLog[] = [];
+// Type declarations for global stores
+declare global {
+  // eslint-disable-next-line no-var
+  var __vendorStore: Map<string, Vendor> | undefined;
+  // eslint-disable-next-line no-var
+  var __sandboxStore: Map<string, SandboxCredentials> | undefined;
+  // eslint-disable-next-line no-var
+  var __auditStore: AuditLog[] | undefined;
+}
+
+// Initialize stores on globalThis to persist across hot reloads in dev mode
+// This ensures vendor created in /api/vendors is visible to /api/sandbox/credentials
+const vendorStore = globalThis.__vendorStore ?? new Map<string, Vendor>();
+const sandboxStore = globalThis.__sandboxStore ?? new Map<string, SandboxCredentials>();
+const auditStore = globalThis.__auditStore ?? ([] as AuditLog[]);
+
+// Persist to globalThis for next hot reload
+globalThis.__vendorStore = vendorStore;
+globalThis.__sandboxStore = sandboxStore;
+globalThis.__auditStore = auditStore;
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -412,6 +429,10 @@ export function clearAllStores(): void {
   vendorStore.clear();
   sandboxStore.clear();
   auditStore.length = 0;
+  // Also clear globalThis references
+  globalThis.__vendorStore = vendorStore;
+  globalThis.__sandboxStore = sandboxStore;
+  globalThis.__auditStore = auditStore;
 }
 
 /**

@@ -7,6 +7,7 @@
 import React, { type ReactElement } from "react";
 import { render, type RenderOptions } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 
 // =============================================================================
 // CUSTOM RENDER WITH PROVIDERS

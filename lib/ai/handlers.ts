@@ -10,6 +10,7 @@
 import {
   getMockPodsDatabase,
   getOneRosterResponse,
+  addPodsApplication,
 } from "@/lib/data/synthetic";
 import {
   getVendor,
@@ -22,7 +23,7 @@ import {
 import { resourcesToEndpoints } from "@/lib/config/oneroster";
 import { FORM_TYPES } from "@/lib/config/forms";
 import { getSsoProviderInfo, getProviderDomain } from "@/lib/config/sso";
-import { AI_TOOLS, type ToolId } from "@/lib/config/ai-tools";
+// CONFIG-03: Tool IDs imported from centralized config for architecture consistency
 import type {
   LookupPodsInput,
   ProvisionSandboxInput,
@@ -161,21 +162,43 @@ export async function handleSubmitPodsLite(input: {
       accessTier: "PRIVACY_SAFE",
     });
 
+    // Also add to mock PoDS database for lookup_pods to find
+    const podsId = `PODS-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`;
+    const now = new Date();
+    const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+    addPodsApplication({
+      id: podsId,
+      vendorName: input.vendorName,
+      applicationName: input.vendorName,
+      contactEmail: input.contactEmail,
+      status: "APPROVED",
+      accessTier: "PRIVACY_SAFE",
+      submittedAt: now,
+      reviewedAt: now,
+      expiresAt: oneYearFromNow,
+    });
+
     return {
       success: true,
       data: {
         vendorId: vendor.id,
+        podsId: podsId,
         vendorName: vendor.name,
         accessTier: vendor.accessTier,
         status: vendor.podsStatus,
         approvedAt: new Date().toISOString(),
         message: "Privacy-Safe access auto-approved! You can now provision sandbox credentials.",
       },
-      message: `PoDS-Lite application approved! Vendor ID: ${vendor.id}. Privacy-Safe tier grants instant access with tokenized data only.`,
+      message: `PoDS-Lite application approved! Application ID: ${podsId}, Vendor ID: ${vendor.id}. Privacy-Safe tier grants instant access with tokenized data only.`,
     };
   }
 
   // Otherwise, trigger the form
+  console.log("[handleSubmitPodsLite] Triggering form with prefill:", {
+    vendorName: input.prefill_vendor_name,
+    email: input.prefill_email,
+  });
   return {
     success: true,
     showForm: FORM_TYPES.PODS_LITE.id,
@@ -1061,6 +1084,7 @@ function determineNextAction(status: IntegrationStatus): {
   }
 
   if (
+    status.sso.schoolday?.status === "NOT_CONFIGURED" &&
     status.sso.clever?.status === "NOT_CONFIGURED" &&
     status.sso.classlink?.status === "NOT_CONFIGURED" &&
     status.sso.google?.status === "NOT_CONFIGURED"
@@ -1068,7 +1092,7 @@ function determineNextAction(status: IntegrationStatus): {
     return {
       action: "configure_sso",
       description:
-        "Configure SSO with Clever, ClassLink, or Google for seamless student login.",
+        "Configure SSO with SchoolDay (recommended) for seamless student login.",
     };
   }
 

@@ -30,7 +30,7 @@ import {
 export interface SchemaFormSectionProps {
   section: FormSectionConfig;
   formData: Record<string, unknown>;
-  errors: Record<string, string>;
+  errors: Record<string, string | undefined>;
   onChange: (field: string, value: unknown) => void;
   disabled?: boolean;
 }

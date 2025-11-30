@@ -8,9 +8,28 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 
 ## Active Focus
 
-### Current Sprint: MVP Refinement
+### Previous Sprint: Integration Layer Bugfixes (Complete)
+**Goal**: Fix 6 critical bugs blocking demo reliability
+**Status**: ✅ Complete - All 38 tests passing
+**Plan**: See [BUGFIX_RELEASE_PLAN.md](./BUGFIX_RELEASE_PLAN.md) for full details
+
+| Fix ID | Bug Description | Status | Priority | Tests |
+|--------|----------------|--------|----------|-------|
+| FIX-001 | Form values don't match endpoint mapping (USERS→/users) | ✅ Fixed | P1 CRITICAL | 10 passing |
+| FIX-002 | Random demo data overrides empty prefill | ✅ Fixed | P1 HIGH | 4 passing |
+| FIX-003 | useState ignores prefill prop changes after mount | ✅ Fixed | P1 HIGH | 3 passing |
+| FIX-004 | AI not extracting vendor names from conversation | ✅ Fixed | P2 | 3 passing |
+| FIX-005 | SSO flow ignores existing vendorState | ✅ Fixed | P2 | 3 passing |
+| FIX-006 | ACADEMIC_SESSIONS not mapped in dataElementsToEndpoints | ✅ Fixed | P3 | 4 passing |
+
+**Test Status**: 38 passing, 0 failing
+**Test File**: `tests/bugfix/integration-layer-fixes.test.ts`
+
+---
+
+### Previous Sprint: MVP Refinement (Complete)
 **Goal**: Polish demo experience and ensure reliability for LAUSD presentations
-**Target**: Demo-ready for stakeholder presentations
+**Status**: ✅ Complete (10/10 tasks)
 
 | Task ID | Task | Status | Priority | Notes |
 |---------|------|--------|----------|-------|
@@ -25,7 +44,7 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 | MVP-05 | Form triggers ([FORM:*]) | ✅ Complete | P2 | 103 tests (unit + integration) |
 | MVP-06 | CPaaS demo polish (CommTestForm) | ✅ Complete | P2 | 205 tests, cost preview + delivery status + privacy explainer + scale calculator |
 
-**Current Task**: MVP Complete! All 10/10 tasks done.
+**Status**: MVP Complete! All 10/10 tasks done.
 
 ### Strategic Documentation (Completed)
 | Task ID | Task | Status | Notes |

@@ -6,8 +6,8 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { type ZodTypeAny, type ZodObject, type ZodRawShape } from "zod";
-import { getMeta, type SchemaDefinition, extractFields } from "../core";
+import { type ZodTypeAny, type ZodRawShape } from "zod";
+import { getMeta, type SchemaDefinition } from "../core";
 
 // =============================================================================
 // TYPES
@@ -65,7 +65,7 @@ function zodToJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
       else if (schema.description) result.description = schema.description;
 
       // Check for string validators using _def.checks
-      const def = schema._def as { checks?: Array<{ kind: string; value?: number }> };
+      const def = schema._def as unknown as { checks?: Array<{ kind: string; value?: number }> };
       const checks = def.checks || [];
       for (const check of checks) {
         if (check.kind === "email") result.format = "email";
@@ -81,7 +81,7 @@ function zodToJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
       const result: Record<string, unknown> = { type: "number" };
       if (meta?.aiDescription) result.description = meta.aiDescription;
 
-      const def = schema._def as { checks?: Array<{ kind: string; value?: number }> };
+      const def = schema._def as unknown as { checks?: Array<{ kind: string; value?: number }> };
       const checks = def.checks || [];
       for (const check of checks) {
         if (check.kind === "int") result.type = "integer";
@@ -111,7 +111,7 @@ function zodToJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
 
     case "ZodArray": {
       // Zod v4.x uses _def.element instead of _def.type
-      const arrayDef = schema._def as { element?: ZodTypeAny; type?: ZodTypeAny };
+      const arrayDef = schema._def as unknown as { element?: ZodTypeAny; type?: ZodTypeAny };
       const itemType = arrayDef.element || arrayDef.type;
       const itemSchema = itemType ? zodToJsonSchema(itemType) : { type: "string" };
       return {
@@ -156,7 +156,7 @@ function zodToJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
       };
 
     case "ZodRecord": {
-      const recordDef = schema._def as { valueType: ZodTypeAny };
+      const recordDef = schema._def as unknown as { valueType: ZodTypeAny };
       return {
         type: "object",
         additionalProperties: zodToJsonSchema(recordDef.valueType),

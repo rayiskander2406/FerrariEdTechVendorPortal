@@ -117,7 +117,7 @@ function compareSections(
   const generatedFieldMap = new Map(generated.fields.map((f) => [f.name, f]));
 
   // Check all existing fields
-  for (const [name, existingField] of existingFieldMap) {
+  for (const [name, existingField] of Array.from(existingFieldMap)) {
     const generatedField = generatedFieldMap.get(name);
 
     if (!generatedField) {
@@ -131,7 +131,7 @@ function compareSections(
   }
 
   // Check for extra fields in generated
-  for (const [name] of generatedFieldMap) {
+  for (const [name] of Array.from(generatedFieldMap)) {
     if (!existingFieldMap.has(name)) {
       fieldResults.push({
         field: name,
@@ -164,7 +164,7 @@ export function compareFormConfigs(
   const generatedSectionMap = new Map(generated.sections.map((s) => [s.id, s]));
 
   // Compare existing sections
-  for (const [id, existingSection] of existingSectionMap) {
+  for (const [id, existingSection] of Array.from(existingSectionMap)) {
     const generatedSection = generatedSectionMap.get(id);
 
     if (!generatedSection) {
@@ -193,7 +193,7 @@ export function compareFormConfigs(
   }
 
   // Check for extra sections in generated
-  for (const [id] of generatedSectionMap) {
+  for (const [id] of Array.from(generatedSectionMap)) {
     if (!existingSectionMap.has(id)) {
       sectionResults.push({
         section: id,

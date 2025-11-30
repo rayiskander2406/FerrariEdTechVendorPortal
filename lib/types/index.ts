@@ -18,6 +18,7 @@ export const PodsStatusEnum = z.enum([
 export type PodsStatus = z.infer<typeof PodsStatusEnum>;
 
 export const DataElementEnum = z.enum([
+  // Legacy PII field types (for backwards compatibility)
   "STUDENT_ID",
   "FIRST_NAME",
   "LAST_NAME",
@@ -32,6 +33,13 @@ export const DataElementEnum = z.enum([
   "SPECIAL_ED",
   "ATTENDANCE",
   "GRADES",
+  // OneRoster resource types (used by PodsLiteForm DATA_ELEMENTS)
+  "USERS",
+  "CLASSES",
+  "COURSES",
+  "ENROLLMENTS",
+  "ORGS",
+  "ACADEMIC_SESSIONS",
 ]);
 export type DataElement = z.infer<typeof DataElementEnum>;
 
