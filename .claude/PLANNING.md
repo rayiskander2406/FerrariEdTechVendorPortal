@@ -1299,6 +1299,79 @@ interface School {
 
 ---
 
+## Moonshot Features Backlog
+
+These are ranked future features with toggleable feature flags. Code location: `lib/features/feature-flags.ts`
+
+Dashboard: `/dashboard/features` | CLI: `/features enable <id>` | `/features disable <id>`
+
+### Feature Matrix
+
+| Rank | ID | Name | Status | Enabled | Dependencies | Maps To |
+|------|-----|------|--------|---------|--------------|---------|
+| 1 | `ai-health-monitor` | AI Integration Health Monitor | Beta | ❌ | - | UX Redesign |
+| 2 | `compliance-pipeline` | Automated Compliance Certification | Alpha | ❌ | - | v1.0 Enhancement |
+| 3 | `synthetic-sandbox` | Synthetic Student Data Sandbox | Beta | ✅ | - | MVP (core) |
+| 4 | `vendor-marketplace` | Vendor-to-Vendor Marketplace | Experimental | ❌ | - | EdTech Credit Bureau |
+| 5 | `predictive-onboarding` | Predictive Onboarding Assistant | Alpha | ❌ | ai-health-monitor | UX Redesign |
+| 6 | `teacher-feedback` | Teacher Feedback Loop | Experimental | ❌ | - | v2.0+ |
+| 7 | `multi-district` | Multi-District Federation | Experimental | ❌ | - | District Admin Portal |
+| 8 | `zero-touch-deploy` | Zero-Touch Deployment Pipeline | Alpha | ❌ | compliance-pipeline | v1.5+ |
+| 9 | `parent-transparency` | Parent Transparency Portal | Experimental | ❌ | - | v2.0+ |
+| 10 | `impact-analytics` | Impact Analytics Dashboard | Experimental | ❌ | synthetic-sandbox | v2.0+ |
+
+### Feature Descriptions & Value
+
+| Feature | Description | Value Proposition |
+|---------|-------------|-------------------|
+| **AI Health Monitor** | Real-time AI-powered monitoring for integration anomalies | Reduces support burden 70%+, enables self-diagnosis, positions LAUSD as tech-forward |
+| **Compliance Pipeline** | Self-service FERPA, COPPA, CA-AB1584 verification | Removes legal/procurement bottleneck, provides marketing badges, creates audit trail |
+| **Synthetic Sandbox** | Realistic synthetic student cohorts (IEP, ELL, foster youth) for testing | Eliminates vendor testing complaints, includes edge cases, zero privacy risk |
+| **Vendor Marketplace** | Vendors discover and connect with each other | Network effects, platform positioning, vendors build on each other |
+| **Predictive Onboarding** | AI learns from successful onboardings to predict blockers | First-time-right rate increases, reduces back-and-forth, institutional memory |
+| **Teacher Feedback** | Anonymous teacher ratings for vendor products | Classroom accountability, actionable vendor signals, empowers teachers |
+| **Multi-District** | Allow other CA districts to federate into same portal | Investment amortization, integrate once deploy many, statewide standards |
+| **Zero-Touch Deploy** | GitOps-style deployment with compliance gates | Removes deployment overhead, automated compliance, faster iteration |
+| **Parent Transparency** | Parent-facing view of data access and opt-out | Community trust, preempts complaints, differentiates as privacy-first |
+| **Impact Analytics** | Track student outcomes correlated with vendor usage | Answers "is this helping students?", data-driven procurement, proof-of-impact |
+
+### Suggested Release Mapping
+
+```
+v1.0 (Production-Ready)
+├── synthetic-sandbox (already enabled)
+└── compliance-pipeline (high value, accelerates vendor approvals)
+
+v1.5 (Multi-Protocol Sandbox)
+├── ai-health-monitor (supports multiple protocol debugging)
+├── predictive-onboarding (depends on ai-health-monitor)
+└── zero-touch-deploy (depends on compliance-pipeline)
+
+Strategic: UX Redesign
+├── ai-health-monitor
+└── predictive-onboarding
+
+Strategic: District Admin Portal
+└── multi-district
+
+Strategic: EdTech Credit Bureau
+└── vendor-marketplace
+
+v2.0+ (Future Vision)
+├── teacher-feedback
+├── parent-transparency
+└── impact-analytics
+```
+
+### Implementation Notes
+
+- **FeatureGate component**: Wrap UI sections to conditionally show based on flags
+- **Dependencies**: Enabling a feature auto-enables its dependencies
+- **Persistence**: Flags stored in localStorage, can be exported/imported as JSON
+- **Status levels**: stable → beta → alpha → experimental (risk indicator)
+
+---
+
 ## Competitive Analysis: Clever vs SchoolDay
 
 | Dimension | Clever (Incumbent) | SchoolDay (Disruptor) |
@@ -2283,6 +2356,7 @@ Leaves buffer for go-to-market, sales, support
 |------|----------|-----------|
 | Dec 1 | **UX Redesign Initiative Scoped** | Chat-first UI is great for demos but suboptimal for daily vendor use. Scoped dashboard-first approach with AI augmentation at 6 specific touchpoints (error diagnosis, response explanation, upgrade help, message drafting, onboarding, config validation). Created prototypes: `portal-reimagined.html` (full dashboard) and `pitch-presentation.html` (exec slides). 7 key decisions (UX-D1 to UX-D7) documented for management review. Estimated 10 weeks effort, can run parallel to v1.0 backend. Key insight: "Chat is the guide, not the destination." |
 | Dec 1 | **District Admin Portal Initiative Scoped** | Identified gap in planning: no mechanism for district IT to configure their vendor ecosystem. Scoped 5 core modules: District Setup Wizard (SSO/SIS/LMS integration), Vendor Governance (credit score thresholds, approval workflows), Communication Policies (channel restrictions, rate limits), Data Policies (default privacy tiers, field blocking), Analytics & Compliance (dashboards, FERPA reports). 8 key decisions (DAP-D1 to DAP-D8) documented. Estimated 10-12 weeks. Critical insight: district-level config enables per-district defaults that simplify individual vendor onboarding. Multi-tenant architecture required. |
+| Dec 1 | **Moonshot Features Integrated into PLANNING.md** | Feature flags existed in code (`lib/features/feature-flags.ts`) but weren't visible in roadmap. Added Moonshot Features Backlog section with: 10 ranked features, status/dependencies matrix, value propositions, and suggested release mapping. Features now cross-referenced to releases (v1.0, v1.5, v2.0+) and Strategic Initiatives (UX Redesign, District Admin Portal, EdTech Credit Bureau). Only `synthetic-sandbox` enabled by default. Key enabler for future planning discussions. |
 | Nov 30 | **MVP Complete: 10/10 tasks, 1070 tests** | MVP-06 CPaaS demo polish completed with 205 new tests. Created lib/config/cpaas.ts SSOT (pricing, channels, delivery status, LAUSD scale constants). CommTestForm now includes: cost preview section, delivery status simulation (QUEUED→SENT→DELIVERED), privacy explainer panel with FERPA/COPPA badges, scale calculator showing LAUSD-wide costs. Following DEVELOPMENT_PATTERNS.md: centralized config first, then consistency tests, then implementation. Total MVP: 1070 tests, zero bugs in production. |
 | Nov 30 | **CPaaS Provider Stack: Vonage + Sinch** | Updated CPAAS_DEVSPIKE.md from SendGrid/Twilio references to actual providers (Vonage/Sinch). Multi-provider strategy enables: rate negotiation leverage, hedging against single provider dependency, failover for reliability. Added V1-14 (provider abstraction) and V1-15 (margin tracking) to v1.0 backlog as P3 tasks. Demo (MVP-06) abstracts this - vendors see "SchoolDay Secure Network" not provider details. |
 | Nov 30 | **MVP-05 Form Triggers Complete** | 103 tests verifying form trigger system: detection from [FORM:*] markers, tool result showForm handling, all 8 forms render correctly, cross-layer consistency (handlers → useChat → page). Total: 865 tests passing. MVP now 9/10 complete. |
