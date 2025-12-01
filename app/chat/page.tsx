@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { Send, CheckCircle2, Loader2, AlertCircle, X, Settings, RotateCcw } from "lucide-react";
+import { Send, CheckCircle2, Loader2, AlertCircle, X, Settings, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/lib/hooks/useChat";
@@ -623,9 +623,27 @@ export default function ChatPage() {
   }, [setActiveForm]);
 
   /**
-   * Handle reset - clears database, localStorage, and reloads the page
+   * Handle clear session - clears localStorage and chat, but keeps database
+   * Use this to start a new conversation without losing vendor data
    */
-  const handleReset = useCallback(async () => {
+  const handleClearSession = useCallback(() => {
+    // Clear all SchoolDay-related localStorage
+    localStorage.removeItem("schoolday_pods_backup");
+    localStorage.removeItem("schoolday_vendor_state");
+    localStorage.removeItem("schoolday-feature-flags");
+
+    // Clear chat state
+    clearChat();
+
+    // Reload the page to reset React state
+    window.location.reload();
+  }, [clearChat]);
+
+  /**
+   * Handle clear database - clears everything including database
+   * Use this to start completely fresh (removes all vendors, PoDS, etc.)
+   */
+  const handleClearDatabase = useCallback(async () => {
     // Clear database first (PoDS applications, vendors, sandboxes)
     try {
       const response = await fetch("/api/reset", { method: "POST" });
@@ -797,14 +815,24 @@ export default function ChatPage() {
                 <span className="text-[10px] sm:text-xs font-medium text-success-700">AI Online</span>
               </div>
 
-              {/* Reset Button */}
+              {/* Clear Session Button */}
               <button
-                onClick={handleReset}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
-                title="Reset session and clear all data"
+                onClick={handleClearSession}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                title="Clear chat and session (keeps database)"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset
+                <RotateCcw className="w-3 h-3" />
+                Session
+              </button>
+
+              {/* Clear Database Button */}
+              <button
+                onClick={handleClearDatabase}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors"
+                title="Clear everything including database"
+              >
+                <Trash2 className="w-3 h-3" />
+                Database
               </button>
 
               {/* Feature Flags Dashboard Link */}
