@@ -774,9 +774,14 @@ export async function handleCheckStatus(
 ): Promise<ToolResult> {
   const { vendor_id, include_details = true } = input;
 
+  console.log(`[handleCheckStatus] Checking status for vendor_id: "${vendor_id}"`);
+
   try {
     const vendor = await getVendor(vendor_id);
     const sandbox = await getSandbox(vendor_id);
+
+    console.log(`[handleCheckStatus] getVendor result:`, vendor ? `Found: ${vendor.name}` : "NOT FOUND");
+    console.log(`[handleCheckStatus] getSandbox result:`, sandbox ? `Found: ${sandbox.apiKey?.slice(0, 10)}...` : "NOT FOUND");
 
     // If no vendor, check mock PoDS database
     let podsInfo = null;
