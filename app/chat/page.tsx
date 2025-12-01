@@ -21,6 +21,9 @@ import { AppSubmitForm, type AppSubmission } from "@/components/forms/AppSubmitF
 import { CredentialsDisplay } from "@/components/dashboard/CredentialsDisplay";
 import { AuditLogViewer } from "@/components/dashboard/AuditLogViewer";
 
+// Error boundaries (HARD-06)
+import { ChatErrorBoundary, FormErrorBoundary } from "@/components/ui/ErrorBoundary";
+
 // DB functions (only for audit logs which don't need server persistence)
 import { logAuditEvent, getAuditLogs } from "@/lib/db";
 
@@ -55,7 +58,7 @@ async function createVendorViaApi(podsLiteInput: PodsLiteInput, accessTier: stri
   }
 
   const data = await response.json();
-  console.log("[createVendorViaApi] Created vendor:", data.vendor.id);
+  // Note: Vendor ID intentionally not logged to avoid PII leakage
   return data.vendor;
 }
 
@@ -87,7 +90,7 @@ async function createSandboxViaApi(vendorId: string, requestedEndpoints?: string
   }
 
   const data = await response.json();
-  console.log("[createSandboxViaApi] Created sandbox:", data.sandbox.id, "with endpoints:", data.sandbox.allowedEndpoints);
+  // Note: Sandbox ID and endpoints intentionally not logged to avoid PII leakage
   return data.sandbox;
 }
 
@@ -204,10 +207,12 @@ export default function ChatPage() {
 
   // ==========================================================================
   // RESTORE PoDS DATA FROM LOCALSTORAGE (survives server restarts)
+  // NOTE: vendorState restoration is now handled by VendorProvider (HARD-01)
+  // This effect only restores server-side PoDS data for AI tool lookups
   // ==========================================================================
 
   useEffect(() => {
-    const restorePodsFromLocalStorage = async () => {
+    const restorePodsToServer = async () => {
       try {
         const backup = localStorage.getItem("schoolday_pods_backup");
         if (!backup) return;
@@ -215,12 +220,7 @@ export default function ChatPage() {
         const backupList = JSON.parse(backup);
         if (!Array.isArray(backupList) || backupList.length === 0) return;
 
-        console.log(`[Chat] Restoring ${backupList.length} PoDS application(s) from localStorage`);
-
-        // Re-persist each PoDS application to the server
-        // Also restore vendorState for the most recent approved vendor
-        let mostRecentApproved: typeof backupList[0] | null = null;
-
+        // Re-persist each PoDS application to the server (silent - no logging)
         for (const podsData of backupList) {
           try {
             await persistPodsApplication({
@@ -229,62 +229,26 @@ export default function ChatPage() {
               reviewedAt: new Date(podsData.reviewedAt),
               expiresAt: new Date(podsData.expiresAt),
             });
-            console.log(`[Chat] Restored PoDS for: ${podsData.vendorName}`);
-
-            // Track the most recent approved vendor for vendorState
-            if (podsData.status === "APPROVED") {
-              mostRecentApproved = podsData;
-            }
-          } catch (err) {
-            console.warn(`[Chat] Failed to restore PoDS for ${podsData.vendorName}:`, err);
+          } catch {
+            // Silent fail - server may already have this data
           }
         }
-
-        // Also restore vendorState from localStorage if available
-        const savedVendorState = localStorage.getItem("schoolday_vendor_state");
-        if (savedVendorState) {
-          try {
-            const parsed = JSON.parse(savedVendorState);
-            console.log("[Chat] Restoring vendorState from localStorage:", parsed);
-            updateVendorState({
-              isOnboarded: parsed.isOnboarded ?? false,
-              vendorId: parsed.vendorId ?? null,
-              companyName: parsed.companyName ?? null,
-              accessTier: parsed.accessTier ?? null,
-              podsStatus: parsed.podsStatus ?? null,
-              credentials: parsed.credentials ?? null,
-              integrations: parsed.integrations ?? [],
-            });
-          } catch (parseErr) {
-            console.warn("[Chat] Failed to parse saved vendorState:", parseErr);
-          }
-        } else if (mostRecentApproved) {
-          // Fallback: create vendorState from restored PoDS data
-          console.log("[Chat] Creating vendorState from restored PoDS:", mostRecentApproved.vendorName);
-          updateVendorState({
-            isOnboarded: true,
-            vendorId: mostRecentApproved.id || `restored_${Date.now()}`,
-            companyName: mostRecentApproved.vendorName,
-            accessTier: (mostRecentApproved.accessTier as "PRIVACY_SAFE" | "SELECTIVE" | "FULL_ACCESS") ?? "PRIVACY_SAFE",
-            podsStatus: mostRecentApproved.status,
-          });
-        }
-      } catch (err) {
-        console.warn("[Chat] Failed to restore from localStorage:", err);
+      } catch {
+        // Silent fail on localStorage restore
       }
     };
 
-    restorePodsFromLocalStorage();
-  }, [updateVendorState]); // Run once on mount
+    restorePodsToServer();
+  }, []); // Run once on mount - no dependencies needed
 
   // ==========================================================================
   // HELPER: Add system message to chat
   // ==========================================================================
 
-  const addSystemMessage = useCallback((content: string) => {
+  const addSystemMessage = useCallback((_content: string) => {
     // This is a workaround since we can't directly add messages
     // In production, this would be handled by the useChat hook
-    console.log("[System Message]", content);
+    // Note: System messages intentionally not logged to avoid console noise
   }, []);
 
   // ==========================================================================
@@ -314,15 +278,8 @@ export default function ChatPage() {
         // Use dataElementsToEndpoints() to map PII field types → API endpoints
         const requestedEndpoints = dataElementsToEndpoints(data.dataElementsRequested);
 
-        // DEBUG: Log endpoint mapping
-        console.log("[handlePodsLiteSubmit] dataElementsRequested:", data.dataElementsRequested);
-        console.log("[handlePodsLiteSubmit] requestedEndpoints (after mapping):", requestedEndpoints);
-
         // Create sandbox credentials via API (server-side storage)
         const creds = await createSandboxViaApi(vendor.id, requestedEndpoints);
-
-        // DEBUG: Log credentials with endpoints
-        console.log("[handlePodsLiteSubmit] creds.allowedEndpoints:", creds.allowedEndpoints);
 
         // Persist to server-side PoDS database so lookup_pods can find it
         const podsId = `PODS-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`;
@@ -367,9 +324,8 @@ export default function ChatPage() {
             });
           }
           localStorage.setItem("schoolday_pods_backup", JSON.stringify(backupList));
-          console.log("[handlePodsLiteSubmit] Saved PoDS backup to localStorage");
-        } catch (lsErr) {
-          console.warn("[handlePodsLiteSubmit] Failed to backup to localStorage:", lsErr);
+        } catch {
+          // Silent fail on localStorage backup - data is persisted on server
         }
 
         // Convert API response to SandboxCredentials format for vendorState
@@ -401,9 +357,8 @@ export default function ChatPage() {
         // Also save vendorState to localStorage for persistence across page reloads
         try {
           localStorage.setItem("schoolday_vendor_state", JSON.stringify(newVendorState));
-          console.log("[handlePodsLiteSubmit] Saved vendorState to localStorage");
-        } catch (lsErr) {
-          console.warn("[handlePodsLiteSubmit] Failed to save vendorState to localStorage:", lsErr);
+        } catch {
+          // Silent fail - state already updated via VendorContext
         }
 
         // NOTE: Removed setActiveForm("credentials") - PodsLiteForm now handles
@@ -690,9 +645,7 @@ export default function ChatPage() {
     switch (activeForm) {
       case "pods_lite":
         // Get prefill from formData (AI tool result) or vendorState
-        console.log("[page.tsx renderForm] formData:", formData);
         const podsPrefill = formData?.prefill as { vendorName?: string; contactEmail?: string } | undefined;
-        console.log("[page.tsx renderForm] podsPrefill:", podsPrefill);
         return (
           <PodsLiteForm
             onSubmit={handlePodsLiteSubmit}
@@ -918,7 +871,8 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Messages */}
+          {/* Messages - wrapped with error boundary (HARD-06) */}
+          <ChatErrorBoundary>
           <div className="space-y-4">
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
@@ -953,9 +907,11 @@ export default function ChatPage() {
                     </div>
                   )}
 
-                  {/* Form Content - full width on mobile */}
+                  {/* Form Content - wrapped with error boundary (HARD-06) */}
                   <div className="p-3 sm:p-4">
-                    {renderForm()}
+                    <FormErrorBoundary formName={getFormTitle(activeForm)}>
+                      {renderForm()}
+                    </FormErrorBoundary>
                   </div>
                 </div>
               </div>
@@ -964,6 +920,7 @@ export default function ChatPage() {
             {/* Scroll anchor */}
             <div ref={messagesEndRef} />
           </div>
+          </ChatErrorBoundary>
         </div>
       </main>
 

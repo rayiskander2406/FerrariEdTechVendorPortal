@@ -322,28 +322,27 @@ describe("Cross-Layer SSO Provider Consistency", () => {
       expect(content).toContain("SsoProviderEnum");
     });
 
-    it("should define SsoProviderEnum as Zod enum", () => {
+    it("should import SsoProviderEnum from centralized config (HARD-05)", () => {
+      // After CONFIG-02/HARD-05, SsoProviderEnum is defined in config/sso.ts
+      // and imported/re-exported by types/index.ts for backwards compatibility
       const typesPath = path.resolve(__dirname, "../../lib/types/index.ts");
       const content = fs.readFileSync(typesPath, "utf-8");
+      expect(content).toMatch(/import.*SsoProviderEnum.*from.*config\/sso/);
+      expect(content).toMatch(/export.*\{.*SsoProviderEnum.*\}/);
+    });
+
+    it("should have SsoProviderEnum defined in lib/config/sso.ts", () => {
+      // SsoProviderEnum has 3 providers (CLEVER, CLASSLINK, GOOGLE) - for vendor-facing AI tools
+      // SsoProviderEnumWithSchoolDay has 4 (includes SCHOOLDAY) - for UI forms
+      const configPath = path.resolve(__dirname, "../../lib/config/sso.ts");
+      const content = fs.readFileSync(configPath, "utf-8");
       expect(content).toMatch(/SsoProviderEnum\s*=\s*z\.enum/);
-    });
-
-    it("should include CLEVER provider", () => {
-      const typesPath = path.resolve(__dirname, "../../lib/types/index.ts");
-      const content = fs.readFileSync(typesPath, "utf-8");
-      expect(content).toMatch(/SsoProviderEnum.*CLEVER/);
-    });
-
-    it("should include CLASSLINK provider", () => {
-      const typesPath = path.resolve(__dirname, "../../lib/types/index.ts");
-      const content = fs.readFileSync(typesPath, "utf-8");
-      expect(content).toMatch(/SsoProviderEnum.*CLASSLINK/);
-    });
-
-    it("should include GOOGLE provider", () => {
-      const typesPath = path.resolve(__dirname, "../../lib/types/index.ts");
-      const content = fs.readFileSync(typesPath, "utf-8");
-      expect(content).toMatch(/SsoProviderEnum.*GOOGLE/);
+      expect(content).toContain("CLEVER");
+      expect(content).toContain("CLASSLINK");
+      expect(content).toContain("GOOGLE");
+      // SCHOOLDAY is in the extended enum (SsoProviderEnumWithSchoolDay)
+      expect(content).toContain("SsoProviderEnumWithSchoolDay");
+      expect(content).toContain("SCHOOLDAY");
     });
 
     it("should export SsoProvider type", () => {

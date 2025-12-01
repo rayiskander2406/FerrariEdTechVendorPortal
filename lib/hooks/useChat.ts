@@ -4,16 +4,20 @@
  * Manages:
  * - Message history with streaming AI responses
  * - Form triggers from AI responses
- * - Vendor state tracking
  * - Loading and error states
+ *
+ * NOTE: Vendor state is now managed by VendorProvider (HARD-01).
+ * This hook consumes vendorState from context but still exposes it
+ * for backwards compatibility with existing components.
  */
 
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { type VendorContext, type AccessTier, type SandboxCredentials, type IntegrationConfig } from "@/lib/types";
+import { type VendorContext as VendorContextType, type AccessTier, type SandboxCredentials, type IntegrationConfig } from "@/lib/types";
 import { NetworkError, getUserErrorMessage } from "@/lib/errors";
 import { getLastFormTrigger } from "@/lib/config/forms";
+import { useVendor, INITIAL_VENDOR_STATE, type VendorState } from "@/lib/contexts";
 
 // =============================================================================
 // TYPES
@@ -42,15 +46,9 @@ export interface ToolCallInfo {
   };
 }
 
-export interface VendorState {
-  isOnboarded: boolean;
-  vendorId: string | null;
-  companyName: string | null;
-  accessTier: AccessTier | null;
-  podsStatus: string | null;
-  credentials: SandboxCredentials | null;
-  integrations: IntegrationConfig[];
-}
+// VendorState is now imported from @/lib/contexts (HARD-01)
+// Re-export for backwards compatibility
+export type { VendorState };
 
 export interface UseChatReturn {
   messages: ChatMessage[];
@@ -71,16 +69,6 @@ export interface UseChatReturn {
 // CONSTANTS
 // =============================================================================
 
-const INITIAL_VENDOR_STATE: VendorState = {
-  isOnboarded: false,
-  vendorId: null,
-  companyName: null,
-  accessTier: null,
-  podsStatus: null,
-  credentials: null,
-  integrations: [],
-};
-
 const FETCH_TIMEOUT_MS = 30000; // 30 seconds
 const SUGGESTIONS_REGEX = /\[SUGGESTIONS:(.*?)\]/g;
 
@@ -89,25 +77,31 @@ const SUGGESTIONS_REGEX = /\[SUGGESTIONS:(.*?)\]/g;
 // =============================================================================
 
 export function useChat(): UseChatReturn {
-  // State
+  // ==========================================================================
+  // VENDOR STATE FROM CONTEXT (HARD-01)
+  // ==========================================================================
+  // Vendor state is now managed by VendorProvider - single source of truth
+  // This eliminates the stale closure issues that required vendorStateRef workarounds
+  const { vendorState, updateVendorState: contextUpdateVendorState } = useVendor();
+
+  // ==========================================================================
+  // LOCAL STATE
+  // ==========================================================================
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeForm, setActiveFormState] = useState<string | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown> | null>(null);
-  const [vendorState, setVendorState] = useState<VendorState>(INITIAL_VENDOR_STATE);
   const [error, setError] = useState<string | null>(null);
   const [suggestedResponses, setSuggestedResponses] = useState<string[]>([]);
 
   // Refs
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // CRITICAL: Use refs for isLoading and vendorState to avoid stale closure issues
-  // The refs are updated synchronously so they always reflect the current state
+  // CRITICAL: Use ref for isLoading to avoid stale closure issues in sendMessage
+  // NOTE: vendorStateRef is no longer needed - context provides fresh state (HARD-01)
   const isLoadingRef = useRef(isLoading);
-  const vendorStateRef = useRef(vendorState);
-  // Update refs synchronously during render (not in useEffect) to avoid timing gaps
+  // Update ref synchronously during render (not in useEffect) to avoid timing gaps
   isLoadingRef.current = isLoading;
-  vendorStateRef.current = vendorState;
 
   // ==========================================================================
   // UTILITY FUNCTIONS
@@ -147,43 +141,34 @@ export function useChat(): UseChatReturn {
 
   /**
    * Build vendor context for API request
-   * CRITICAL: Uses vendorStateRef.current to always get the latest state,
-   * avoiding stale closure issues when called from sendMessage
+   * NOTE: Now uses vendorState from VendorProvider context (HARD-01)
+   * No more ref needed - context provides fresh state automatically
    */
-  const buildVendorContext = useCallback((): VendorContext | undefined => {
-    // Use ref to get current state, not closure value
-    const currentVendorState = vendorStateRef.current;
-
-    console.log("[buildVendorContext] vendorState:", {
-      vendorId: currentVendorState.vendorId,
-      companyName: currentVendorState.companyName,
-      podsStatus: currentVendorState.podsStatus,
-      isOnboarded: currentVendorState.isOnboarded,
-    });
-    if (!currentVendorState.vendorId) {
-      console.log("[buildVendorContext] No vendorId, returning undefined");
+  const buildVendorContext = useCallback((): VendorContextType | undefined => {
+    // Note: Vendor state intentionally not logged to avoid browser console exposure
+    if (!vendorState.vendorId) {
       return undefined;
     }
 
     return {
-      vendor: currentVendorState.vendorId
+      vendor: vendorState.vendorId
         ? {
-            id: currentVendorState.vendorId,
-            name: currentVendorState.companyName ?? "Unknown",
+            id: vendorState.vendorId,
+            name: vendorState.companyName ?? "Unknown",
             contactEmail: "", // Would be populated from actual vendor data
             contactName: "",
-            accessTier: currentVendorState.accessTier ?? "PRIVACY_SAFE",
-            podsStatus: (currentVendorState.podsStatus as "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED") ?? "NOT_STARTED",
+            accessTier: vendorState.accessTier ?? "PRIVACY_SAFE",
+            podsStatus: (vendorState.podsStatus as "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED") ?? "NOT_STARTED",
             createdAt: new Date(),
             updatedAt: new Date(),
           }
         : undefined,
-      sandboxCredentials: currentVendorState.credentials ?? undefined,
-      integrations: currentVendorState.integrations,
+      sandboxCredentials: vendorState.credentials ?? undefined,
+      integrations: vendorState.integrations,
       sessionId: `session_${Date.now()}`,
       lastActivity: new Date(),
     };
-  }, []); // No dependencies needed since we use ref
+  }, [vendorState]); // Depend on vendorState from context
 
   // ==========================================================================
   // MAIN FUNCTIONS
@@ -200,10 +185,6 @@ export function useChat(): UseChatReturn {
       // Use ref to check current isLoading state, not closure value
       // This is critical for demo mode where ref chains can have timing gaps
       if (!content.trim() || isLoadingRef.current) {
-        console.log("[useChat] sendMessage blocked:", {
-          emptyContent: !content.trim(),
-          isLoading: isLoadingRef.current
-        });
         return;
       }
 
@@ -225,6 +206,10 @@ export function useChat(): UseChatReturn {
       // Add user message to state
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
+      // CRITICAL: Update ref immediately to block concurrent sendMessage calls
+      // The ref normally syncs during render (line 104), but we need it NOW
+      // to prevent race conditions before React re-renders
+      isLoadingRef.current = true;
 
       // Create placeholder for AI response
       const aiMessageId = generateMessageId();
@@ -498,13 +483,13 @@ export function useChat(): UseChatReturn {
   }, []);
 
   /**
-   * Update vendor state
+   * Update vendor state - delegates to VendorProvider context (HARD-01)
    */
   const updateVendorState = useCallback(
     (updates: Partial<VendorState>): void => {
-      setVendorState((prev) => ({ ...prev, ...updates }));
+      contextUpdateVendorState(updates);
     },
-    []
+    [contextUpdateVendorState]
   );
 
   /**

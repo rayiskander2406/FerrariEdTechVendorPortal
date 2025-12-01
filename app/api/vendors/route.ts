@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     // Create vendor on server-side
     const vendor = await createVendor({ podsLiteInput, accessTier });
 
-    console.log("[API/vendors] Created vendor:", vendor.id, vendor.name);
+    // Note: Vendor ID/name intentionally not logged to avoid PII leakage
 
     return NextResponse.json({
       success: true,
