@@ -623,12 +623,25 @@ export default function ChatPage() {
   }, [setActiveForm]);
 
   /**
-   * Handle reset - clears localStorage and reloads the page
+   * Handle reset - clears database, localStorage, and reloads the page
    */
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
+    // Clear database first (PoDS applications, vendors, sandboxes)
+    try {
+      const response = await fetch("/api/reset", { method: "POST" });
+      if (!response.ok) {
+        console.error("[Reset] API call failed:", await response.text());
+      } else {
+        console.log("[Reset] Database cleared successfully");
+      }
+    } catch (error) {
+      console.error("[Reset] Failed to clear database:", error);
+    }
+
     // Clear all SchoolDay-related localStorage
     localStorage.removeItem("schoolday_pods_backup");
     localStorage.removeItem("schoolday_vendor_state");
+    localStorage.removeItem("schoolday-feature-flags");
 
     // Clear chat state
     clearChat();
