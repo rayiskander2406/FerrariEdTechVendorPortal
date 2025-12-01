@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     // Check for existing sandbox
     const existing = await getSandbox(vendorId);
     if (existing && existing.status === "ACTIVE") {
-      console.log("[API/sandbox/credentials] Returning existing sandbox for vendor:", vendorId);
+      // Note: Vendor ID intentionally not logged to avoid PII leakage
       return NextResponse.json({
         success: true,
         existing: true,
@@ -62,8 +62,7 @@ export async function POST(request: NextRequest) {
     // Create new sandbox on server-side
     const sandbox = await createSandbox(vendorId, requestedEndpoints);
 
-    console.log("[API/sandbox/credentials] Created sandbox:", sandbox.id, "for vendor:", vendorId);
-    console.log("[API/sandbox/credentials] Allowed endpoints:", sandbox.allowedEndpoints);
+    // Note: Sandbox/vendor IDs and endpoints intentionally not logged to avoid PII leakage
 
     return NextResponse.json({
       success: true,

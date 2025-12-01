@@ -35,8 +35,8 @@ import {
 
 describe("AI Tools Constants", () => {
   describe("AI_TOOLS", () => {
-    it("should contain all 12 tools", () => {
-      expect(Object.keys(AI_TOOLS)).toHaveLength(12);
+    it("should contain all 13 tools", () => {
+      expect(Object.keys(AI_TOOLS)).toHaveLength(13);
     });
 
     it("should have LOOKUP_PODS tool", () => {
@@ -58,8 +58,8 @@ describe("AI Tools Constants", () => {
   });
 
   describe("ALL_TOOL_KEYS", () => {
-    it("should have exactly 12 keys", () => {
-      expect(ALL_TOOL_KEYS).toHaveLength(12);
+    it("should have exactly 13 keys", () => {
+      expect(ALL_TOOL_KEYS).toHaveLength(13);
     });
 
     it("should include LOOKUP_PODS", () => {
@@ -73,8 +73,8 @@ describe("AI Tools Constants", () => {
   });
 
   describe("ALL_TOOL_IDS", () => {
-    it("should have exactly 12 IDs", () => {
-      expect(ALL_TOOL_IDS).toHaveLength(12);
+    it("should have exactly 13 IDs", () => {
+      expect(ALL_TOOL_IDS).toHaveLength(13);
     });
 
     it("should include lookup_pods", () => {
@@ -89,8 +89,8 @@ describe("AI Tools Constants", () => {
   });
 
   describe("TOOL_COUNT", () => {
-    it("should equal 12", () => {
-      expect(TOOL_COUNT).toBe(12);
+    it("should equal 13", () => {
+      expect(TOOL_COUNT).toBe(13);
     });
 
     it("should match AI_TOOLS count", () => {

@@ -94,8 +94,8 @@ function createMockPodsLiteInput(overrides: Partial<PodsLiteInput> = {}): PodsLi
 // TEST SETUP
 // =============================================================================
 
-beforeEach(() => {
-  clearAllStores();
+beforeEach(async () => {
+  await clearAllStores();
 });
 
 // =============================================================================

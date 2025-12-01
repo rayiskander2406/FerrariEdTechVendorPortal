@@ -945,6 +945,337 @@ All sandboxes share these v1.0 components:
 
 ---
 
+## Strategic Initiative: UX Redesign (Dashboard-First + AI Augmentation)
+
+> **Prototypes Created**: See `portal-reimagined.html` and `pitch-presentation.html` in project root
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║     UX REDESIGN - FROM CHAT-FIRST TO DASHBOARD-FIRST                     ║
+║     Status: 📋 SCOPED - Pending Management Review                        ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  CURRENT STATE (Chat-First)          │  PROPOSED STATE (Dashboard-First) ║
+║  ────────────────────────────────────│──────────────────────────────────  ║
+║  • AI chat is primary interface      │  • Traditional dashboard primary   ║
+║  • Users type to do anything         │  • One-click for common tasks      ║
+║  • Discoverability is poor           │  • Clear navigation sidebar        ║
+║  • Repeat tasks require typing       │  • AI assists at specific points   ║
+║  • Great for demos, slow for work    │  • Fast for power users + guided   ║
+║                                                                          ║
+║  KEY INSIGHT: Chat is the guide, not the destination.                    ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  AI AUGMENTATION TOUCHPOINTS (Where AI adds genuine value)               ║
+║  ─────────────────────────────────────────────────────────               ║
+║                                                                          ║
+║  TOUCHPOINT          │  TRIGGER               │  AI BEHAVIOR             ║
+║  ────────────────────│────────────────────────│────────────────────────  ║
+║  Error Diagnosis     │  Click "AI Diagnose"   │  Analyzes config/logs    ║
+║  Response Explainer  │  Click "Explain"       │  Describes tokenized     ║
+║  Upgrade Helper      │  Click "Request"       │  Drafts justification    ║
+║  Message Drafter     │  Click "Draft with AI" │  Generates templates     ║
+║  Onboarding Guide    │  First login / "Help"  │  Shows next steps        ║
+║  Config Validator    │  Pre-submit            │  Validates settings      ║
+║                                                                          ║
+║  NON-AI TASKS (Traditional UI is better)                                 ║
+║  • View credentials    → Card with copy button                           ║
+║  • Check status        → Dashboard with indicators                       ║
+║  • Rotate keys         → Button + confirm modal                          ║
+║  • View audit logs     → Filterable table                                ║
+║  • Download exports    → Direct download button                          ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+### UX Redesign: Key Decisions Required
+
+| # | Decision | Options | Considerations | Owner |
+|---|----------|---------|----------------|-------|
+| UX-D1 | **Keep current chat UI as fallback?** | A) Replace entirely B) Keep as "Chat Mode" toggle C) Deprecate after transition | Option B allows A/B testing; Option A is cleaner | TBD |
+| UX-D2 | **AI panel behavior** | A) Slide-in from right B) Modal overlay C) Inline expansion | Slide-in (A) tested well in prototype; doesn't obscure main content | TBD |
+| UX-D3 | **Component library** | A) Build custom B) Use shadcn/ui C) Use Radix + custom styling | shadcn/ui (B) is Tailwind-native, copy-paste components | TBD |
+| UX-D4 | **Design system ownership** | A) Internal only B) Hire contractor C) Partner with design agency | Depends on timeline and budget | TBD |
+| UX-D5 | **Mobile responsiveness** | A) Desktop-only MVP B) Responsive from start C) Separate mobile app | EdTech IT admins are desktop-primary; (A) acceptable for v1 | TBD |
+| UX-D6 | **Accessibility standard** | A) WCAG 2.1 AA B) WCAG 2.1 AAA C) Best effort | K-12 contracts often require AA compliance; recommend (A) | TBD |
+| UX-D7 | **User testing approach** | A) Internal only B) Beta with 3-5 vendors C) Public beta | Recommend (B) - real feedback without scale risk | TBD |
+
+### UX Redesign: Implementation Phases
+
+| Phase | Focus | Deliverables | Effort | Dependencies |
+|-------|-------|--------------|--------|--------------|
+| **Phase 0: Decision** | Resolve UX-D1 through UX-D7 | Decision document signed off | 1 week | Management review |
+| **Phase 1: Design System** | Colors, typography, components | Figma/code component library | 2 weeks | UX-D3, UX-D4 |
+| **Phase 2: Dashboard Shell** | Layout, navigation, routing | Sidebar + header + routing | 1 week | Phase 1 |
+| **Phase 3: Core Pages** | Status, Credentials, SSO, API | 4 main dashboard pages | 2 weeks | Phase 2 |
+| **Phase 4: AI Integration** | Panel, touchpoints, responses | AI assistance layer | 1 week | Phase 3 |
+| **Phase 5: Migration** | Port existing functionality | All current features working | 2 weeks | Phase 4 |
+| **Phase 6: Polish** | Animations, edge cases, a11y | Production-ready UI | 1 week | Phase 5 |
+
+**Total Estimated Effort**: 10 weeks (can parallelize with backend work)
+
+### UX Redesign: GO/NO-GO Gates
+
+| Gate | Criteria | Status |
+|------|----------|--------|
+| **DECISION** | All UX-D* decisions documented and approved | 📋 Pending |
+| **PROTOTYPE** | Interactive prototype tested with 3+ users | ✅ Done (portal-reimagined.html) |
+| **DESIGN** | Component library covers all current features | 📋 Pending |
+| **PARITY** | All current functionality works in new UI | 📋 Pending |
+| **PERFORMANCE** | Page load < 2s, interactions < 100ms | 📋 Pending |
+| **ACCESSIBILITY** | WCAG 2.1 AA compliance verified | 📋 Pending |
+
+### UX Redesign: Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Scope creep ("while we're at it...") | High | High | Strict feature parity first, enhancements in v2 |
+| User resistance to change | Medium | Medium | Keep chat mode as fallback (UX-D1 Option B) |
+| Timeline pressure | Medium | High | Phase 1-2 can run parallel to v1.0 backend work |
+| Design inconsistency | Medium | Medium | Establish design system before building pages |
+| AI touchpoints feel gimmicky | Low | High | User test each touchpoint; remove if not valuable |
+
+### UX Redesign: Open Questions for Management
+
+1. **Priority vs. v1.0 backend work?** This is UI; v1.0 is infrastructure (PostgreSQL, auth, sessions). Can run in parallel if resourced.
+
+2. **Who owns design?** Options: existing team, contractor, agency partnership. Impacts timeline and budget.
+
+3. **Is current chat UI acceptable for LAUSD demo?** If yes, UX redesign can be post-v1.0. If not, needs to be parallel.
+
+4. **Budget for user testing?** Recommend compensating 3-5 beta vendor users for feedback sessions.
+
+5. **Success metric?** Suggest: "Task completion time 50% faster than chat-first UI" measured via user testing.
+
+---
+
+## Strategic Initiative: District Admin Portal
+
+> **Dependency**: Requires v1.0 data layer (PostgreSQL, authentication) to be complete
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║     DISTRICT ADMIN PORTAL                                                ║
+║     "Self-Service District Configuration & Vendor Governance"            ║
+║     Status: 📋 SCOPED - Pending Management Review                        ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  WHY THIS MATTERS                                                        ║
+║  ─────────────────                                                       ║
+║  • Districts can't onboard vendors without configuring their environment ║
+║  • LAUSD alone has 1,000+ schools - manual setup is not scalable         ║
+║  • Vendor governance (credit scores, policies) is a key differentiator   ║
+║  • Self-service reduces SchoolDay support burden                         ║
+║                                                                          ║
+║  CURRENT STATE: Vendor Portal only. No district-side configuration.      ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  5 CORE MODULES                                                          ║
+║  ──────────────                                                          ║
+║                                                                          ║
+║  MODULE 1: DISTRICT SETUP WIZARD                                         ║
+║  ├── Basic info (name, domain, NCES ID, student count)                   ║
+║  ├── Schools management (CRUD, grade ranges, enrollment)                 ║
+║  ├── Organizational hierarchy (district → local districts → schools)     ║
+║  ├── SIS connection (PowerSchool, Infinite Campus, Skyward, Aeries)      ║
+║  └── District staff SSO (separate from vendor SSO)                       ║
+║                                                                          ║
+║  MODULE 2: VENDOR GOVERNANCE                                             ║
+║  ├── Minimum credit score thresholds per access tier                     ║
+║  │   • Privacy-Safe: Score ≥ 40 (configurable)                           ║
+║  │   • Selective: Score ≥ 60 + manual review                             ║
+║  │   • Full Access: Score ≥ 80 + board approval                          ║
+║  ├── Custom approval workflows (single approver → multi-level)           ║
+║  ├── Vendor allow/block lists                                            ║
+║  ├── Category restrictions (e.g., "no social media apps")                ║
+║  └── Contract/DPA template management                                    ║
+║                                                                          ║
+║  MODULE 3: COMMUNICATION POLICIES                                        ║
+║  ├── Time-of-day restrictions (e.g., "no messages before 7am")           ║
+║  ├── Message frequency limits per vendor                                 ║
+║  ├── Content filtering rules (prohibited words, PII detection)           ║
+║  ├── Channel permissions (email only, SMS allowed, push allowed)         ║
+║  └── Parent opt-out management                                           ║
+║                                                                          ║
+║  MODULE 4: DATA POLICIES                                                 ║
+║  ├── Field-level access control per tier                                 ║
+║  ├── Data retention requirements (30 days, 1 year, etc.)                 ║
+║  ├── Export/deletion request handling                                    ║
+║  ├── Tokenization settings (which fields to tokenize)                    ║
+║  └── Sync frequency configuration                                        ║
+║                                                                          ║
+║  MODULE 5: ANALYTICS & COMPLIANCE                                        ║
+║  ├── Vendor usage dashboards (API calls, messages sent)                  ║
+║  ├── Compliance reports (FERPA, COPPA, SOPIPA)                           ║
+║  ├── Audit log access with search/filter                                 ║
+║  ├── Anomaly alerts (unusual access patterns)                            ║
+║  └── Annual review reminders                                             ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  LAUSD-SPECIFIC REQUIREMENTS                                             ║
+║  ────────────────────────────                                            ║
+║  • 1,000+ schools across 8 Local Districts                               ║
+║  • 670,000 students, 75,000 employees                                    ║
+║  • Existing systems: Schoology (LMS), MiSiS (SIS), Google Workspace      ║
+║  • Nested hierarchy: LAUSD → Local District → School → Department        ║
+║  • Board approval required for Full Access tier                          ║
+║                                                                          ║
+║  ESTIMATED EFFORT: 10-12 weeks                                           ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+### District Admin Portal: Key Decisions Required
+
+| # | Decision | Options | Considerations | Owner |
+|---|----------|---------|----------------|-------|
+| DAP-D1 | **Start with LAUSD-specific or generic?** | A) LAUSD-first, generalize later B) Generic from start C) Configurable multi-tenant | LAUSD is the pilot; (A) faster to market, (B) more scalable | TBD |
+| DAP-D2 | **Credit score enforcement** | A) Hard block B) Soft warning + override C) Configurable per district | Recommend (C) - districts have different risk tolerances | TBD |
+| DAP-D3 | **School data source** | A) Manual entry B) SIS sync C) NCES database import D) All of above | (D) provides flexibility; NCES gives baseline | TBD |
+| DAP-D4 | **Approval workflow complexity** | A) Single approver B) Role-based (IT → Privacy → Legal) C) Fully customizable | LAUSD needs (B) minimum; (C) is over-engineering risk | TBD |
+| DAP-D5 | **Multi-tenant architecture** | A) Single DB, district isolation B) DB-per-district C) Hybrid | (A) simpler; (B) better for enterprise sales | TBD |
+| DAP-D6 | **Admin portal tech stack** | A) Same as vendor portal (Next.js) B) Separate admin app C) Embedded in vendor portal | (A) code reuse; (B) cleaner separation | TBD |
+| DAP-D7 | **SIS integration depth** | A) Manual CSV upload B) Scheduled sync C) Real-time webhooks D) All tiers | Start with (A+B), add (C) for premium | TBD |
+| DAP-D8 | **Sub-admin roles** | A) District-wide admins only B) School-level admins C) Department-level | LAUSD Local Districts need (B) minimum | TBD |
+
+### District Admin Portal: Implementation Phases
+
+| Phase | Focus | Deliverables | Effort | Dependencies |
+|-------|-------|--------------|--------|--------------|
+| **Phase 0: Decision** | Resolve DAP-D1 through DAP-D8 | Decision document signed off | 1 week | Management review |
+| **Phase 1: District Setup** | Basic config + schools | Wizard, school CRUD, basic info | 2 weeks | v1.0 data layer |
+| **Phase 2: SIS Integration** | Connect to student data | PowerSchool, IC, Skyward adapters | 2 weeks | Phase 1 |
+| **Phase 3: Vendor Governance** | Credit scores + approvals | Score thresholds, approval workflows | 2 weeks | EdTech Credit Bureau |
+| **Phase 4: Policies** | Communication + data rules | Policy configuration UI, enforcement | 2 weeks | Phase 3 |
+| **Phase 5: Analytics** | Dashboards + compliance | Usage reports, audit access | 2 weeks | Phase 4 |
+| **Phase 6: Polish** | LAUSD pilot feedback | Bug fixes, UX refinements | 2 weeks | LAUSD testing |
+
+**Total Estimated Effort**: 10-12 weeks
+
+### District Admin Portal: GO/NO-GO Gates
+
+| Gate | Criteria | Status |
+|------|----------|--------|
+| **DECISION** | All DAP-D* decisions documented and approved | 📋 Pending |
+| **SCHOOLS** | LAUSD can import/manage 1,000+ schools | 📋 Pending |
+| **SIS** | At least one SIS integration working (PowerSchool or IC) | 📋 Pending |
+| **GOVERNANCE** | Credit score thresholds configurable and enforced | 📋 Pending |
+| **POLICIES** | Communication time restrictions working | 📋 Pending |
+| **SCALE** | System handles LAUSD scale (670K students) | 📋 Pending |
+| **SECURITY** | Role-based access control verified | 📋 Pending |
+
+### District Admin Portal: Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Scope creep (every district wants custom features) | High | High | Start with LAUSD, say "no" to others until v2 |
+| SIS integration complexity | High | Medium | Start with CSV upload, add live sync later |
+| LAUSD organizational complexity | Medium | High | Involve LAUSD IT early; build for nested hierarchy |
+| Performance at scale (1000 schools) | Medium | High | Pagination, caching, lazy loading from day 1 |
+| Approval workflow edge cases | Medium | Medium | Keep workflows simple; avoid Turing-complete rules |
+| Security (district admins have broad access) | Medium | Critical | Audit logging, principle of least privilege |
+
+### District Admin Portal: Data Model Sketch
+
+```typescript
+interface District {
+  id: string;
+  name: string;                    // "Los Angeles Unified School District"
+  slug: string;                    // "lausd"
+  ncesId: string;                  // National Center for Education Statistics ID
+  domain: string;                  // "lausd.net"
+  studentCount: number;
+  employeeCount: number;
+
+  // Hierarchy
+  localDistricts?: LocalDistrict[];  // For large districts like LAUSD
+  schools: School[];
+
+  // Integrations
+  sisType: 'powerschool' | 'infinite_campus' | 'skyward' | 'aeries' | 'other';
+  sisConfig: SISConfig;
+  lmsType: 'schoology' | 'canvas' | 'google_classroom' | 'other';
+  idpType: 'google' | 'azure_ad' | 'clever' | 'classlink' | 'other';
+
+  // Governance
+  vendorPolicies: VendorPolicies;
+  communicationPolicies: CommPolicies;
+  dataPolicies: DataPolicies;
+
+  // Admin
+  admins: DistrictAdmin[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface VendorPolicies {
+  minCreditScore: {
+    privacySafe: number;           // e.g., 40
+    selective: number;             // e.g., 60
+    fullAccess: number;            // e.g., 80
+  };
+  requireManualReview: {
+    selective: boolean;            // true
+    fullAccess: boolean;           // true
+  };
+  blockedCategories: string[];     // ["social_media", "gaming"]
+  blockedVendors: string[];        // Vendor IDs
+  allowedVendors: string[];        // Whitelist (if set, only these allowed)
+  approvalWorkflow: ApprovalWorkflow;
+}
+
+interface CommPolicies {
+  allowedChannels: ('email' | 'sms' | 'push')[];
+  quietHours: { start: string; end: string };  // "22:00" - "07:00"
+  maxMessagesPerVendorPerDay: number;
+  contentFilters: ContentFilter[];
+  requireParentOptIn: boolean;
+}
+
+interface School {
+  id: string;
+  districtId: string;
+  localDistrictId?: string;
+  name: string;
+  ncesId: string;
+  gradeRange: { low: string; high: string };  // "K" - "5", "6" - "8", "9" - "12"
+  studentCount: number;
+  address: Address;
+  principal?: string;
+  active: boolean;
+}
+```
+
+### District Admin Portal: Open Questions for Management
+
+1. **Priority relative to Vendor Portal UX Redesign?** Both are significant efforts. Can they run in parallel with separate teams?
+
+2. **LAUSD as design partner?** Should we formally engage LAUSD IT as co-designers with early access and feedback loops?
+
+3. **Pricing model?** Is District Admin Portal:
+   - A) Free (districts are the customer, vendors pay via CPaaS)
+   - B) Freemium (basic free, advanced governance features paid)
+   - C) Enterprise sales (custom pricing per district)
+
+4. **Build vs. buy for SIS integration?** Should we use existing SIS middleware (e.g., Clever, ClassLink) initially and build native later?
+
+5. **Compliance certifications?** Do we need SOC 2 Type II before enterprise districts will adopt?
+
+6. **Who is the buyer?** Is this sold to:
+   - A) District CTO/CIO
+   - B) Privacy Officer
+   - C) Superintendent
+   - D) School Board
+
+---
+
 ## Strategic Vision
 
 ```
@@ -965,6 +1296,79 @@ All sandboxes share these v1.0 components:
 ║                                                                          ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
+
+---
+
+## Moonshot Features Backlog
+
+These are ranked future features with toggleable feature flags. Code location: `lib/features/feature-flags.ts`
+
+Dashboard: `/dashboard/features` | CLI: `/features enable <id>` | `/features disable <id>`
+
+### Feature Matrix
+
+| Rank | ID | Name | Status | Enabled | Dependencies | Maps To |
+|------|-----|------|--------|---------|--------------|---------|
+| 1 | `ai-health-monitor` | AI Integration Health Monitor | Beta | ❌ | - | UX Redesign |
+| 2 | `compliance-pipeline` | Automated Compliance Certification | Alpha | ❌ | - | v1.0 Enhancement |
+| 3 | `synthetic-sandbox` | Synthetic Student Data Sandbox | Beta | ✅ | - | MVP (core) |
+| 4 | `vendor-marketplace` | Vendor-to-Vendor Marketplace | Experimental | ❌ | - | EdTech Credit Bureau |
+| 5 | `predictive-onboarding` | Predictive Onboarding Assistant | Alpha | ❌ | ai-health-monitor | UX Redesign |
+| 6 | `teacher-feedback` | Teacher Feedback Loop | Experimental | ❌ | - | v2.0+ |
+| 7 | `multi-district` | Multi-District Federation | Experimental | ❌ | - | District Admin Portal |
+| 8 | `zero-touch-deploy` | Zero-Touch Deployment Pipeline | Alpha | ❌ | compliance-pipeline | v1.5+ |
+| 9 | `parent-transparency` | Parent Transparency Portal | Experimental | ❌ | - | v2.0+ |
+| 10 | `impact-analytics` | Impact Analytics Dashboard | Experimental | ❌ | synthetic-sandbox | v2.0+ |
+
+### Feature Descriptions & Value
+
+| Feature | Description | Value Proposition |
+|---------|-------------|-------------------|
+| **AI Health Monitor** | Real-time AI-powered monitoring for integration anomalies | Reduces support burden 70%+, enables self-diagnosis, positions LAUSD as tech-forward |
+| **Compliance Pipeline** | Self-service FERPA, COPPA, CA-AB1584 verification | Removes legal/procurement bottleneck, provides marketing badges, creates audit trail |
+| **Synthetic Sandbox** | Realistic synthetic student cohorts (IEP, ELL, foster youth) for testing | Eliminates vendor testing complaints, includes edge cases, zero privacy risk |
+| **Vendor Marketplace** | Vendors discover and connect with each other | Network effects, platform positioning, vendors build on each other |
+| **Predictive Onboarding** | AI learns from successful onboardings to predict blockers | First-time-right rate increases, reduces back-and-forth, institutional memory |
+| **Teacher Feedback** | Anonymous teacher ratings for vendor products | Classroom accountability, actionable vendor signals, empowers teachers |
+| **Multi-District** | Allow other CA districts to federate into same portal | Investment amortization, integrate once deploy many, statewide standards |
+| **Zero-Touch Deploy** | GitOps-style deployment with compliance gates | Removes deployment overhead, automated compliance, faster iteration |
+| **Parent Transparency** | Parent-facing view of data access and opt-out | Community trust, preempts complaints, differentiates as privacy-first |
+| **Impact Analytics** | Track student outcomes correlated with vendor usage | Answers "is this helping students?", data-driven procurement, proof-of-impact |
+
+### Suggested Release Mapping
+
+```
+v1.0 (Production-Ready)
+├── synthetic-sandbox (already enabled)
+└── compliance-pipeline (high value, accelerates vendor approvals)
+
+v1.5 (Multi-Protocol Sandbox)
+├── ai-health-monitor (supports multiple protocol debugging)
+├── predictive-onboarding (depends on ai-health-monitor)
+└── zero-touch-deploy (depends on compliance-pipeline)
+
+Strategic: UX Redesign
+├── ai-health-monitor
+└── predictive-onboarding
+
+Strategic: District Admin Portal
+└── multi-district
+
+Strategic: EdTech Credit Bureau
+└── vendor-marketplace
+
+v2.0+ (Future Vision)
+├── teacher-feedback
+├── parent-transparency
+└── impact-analytics
+```
+
+### Implementation Notes
+
+- **FeatureGate component**: Wrap UI sections to conditionally show based on flags
+- **Dependencies**: Enabling a feature auto-enables its dependencies
+- **Persistence**: Flags stored in localStorage, can be exported/imported as JSON
+- **Status levels**: stable → beta → alpha → experimental (risk indicator)
 
 ---
 
@@ -1950,6 +2354,9 @@ Leaves buffer for go-to-market, sales, support
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| Dec 1 | **UX Redesign Initiative Scoped** | Chat-first UI is great for demos but suboptimal for daily vendor use. Scoped dashboard-first approach with AI augmentation at 6 specific touchpoints (error diagnosis, response explanation, upgrade help, message drafting, onboarding, config validation). Created prototypes: `portal-reimagined.html` (full dashboard) and `pitch-presentation.html` (exec slides). 7 key decisions (UX-D1 to UX-D7) documented for management review. Estimated 10 weeks effort, can run parallel to v1.0 backend. Key insight: "Chat is the guide, not the destination." |
+| Dec 1 | **District Admin Portal Initiative Scoped** | Identified gap in planning: no mechanism for district IT to configure their vendor ecosystem. Scoped 5 core modules: District Setup Wizard (SSO/SIS/LMS integration), Vendor Governance (credit score thresholds, approval workflows), Communication Policies (channel restrictions, rate limits), Data Policies (default privacy tiers, field blocking), Analytics & Compliance (dashboards, FERPA reports). 8 key decisions (DAP-D1 to DAP-D8) documented. Estimated 10-12 weeks. Critical insight: district-level config enables per-district defaults that simplify individual vendor onboarding. Multi-tenant architecture required. |
+| Dec 1 | **Moonshot Features Integrated into PLANNING.md** | Feature flags existed in code (`lib/features/feature-flags.ts`) but weren't visible in roadmap. Added Moonshot Features Backlog section with: 10 ranked features, status/dependencies matrix, value propositions, and suggested release mapping. Features now cross-referenced to releases (v1.0, v1.5, v2.0+) and Strategic Initiatives (UX Redesign, District Admin Portal, EdTech Credit Bureau). Only `synthetic-sandbox` enabled by default. Key enabler for future planning discussions. |
 | Nov 30 | **MVP Complete: 10/10 tasks, 1070 tests** | MVP-06 CPaaS demo polish completed with 205 new tests. Created lib/config/cpaas.ts SSOT (pricing, channels, delivery status, LAUSD scale constants). CommTestForm now includes: cost preview section, delivery status simulation (QUEUED→SENT→DELIVERED), privacy explainer panel with FERPA/COPPA badges, scale calculator showing LAUSD-wide costs. Following DEVELOPMENT_PATTERNS.md: centralized config first, then consistency tests, then implementation. Total MVP: 1070 tests, zero bugs in production. |
 | Nov 30 | **CPaaS Provider Stack: Vonage + Sinch** | Updated CPAAS_DEVSPIKE.md from SendGrid/Twilio references to actual providers (Vonage/Sinch). Multi-provider strategy enables: rate negotiation leverage, hedging against single provider dependency, failover for reliability. Added V1-14 (provider abstraction) and V1-15 (margin tracking) to v1.0 backlog as P3 tasks. Demo (MVP-06) abstracts this - vendors see "SchoolDay Secure Network" not provider details. |
 | Nov 30 | **MVP-05 Form Triggers Complete** | 103 tests verifying form trigger system: detection from [FORM:*] markers, tool result showForm handling, all 8 forms render correctly, cross-layer consistency (handlers → useChat → page). Total: 865 tests passing. MVP now 9/10 complete. |

@@ -71,11 +71,11 @@ function validateApiKey(request: NextRequest): { valid: boolean; error?: string 
     };
   }
 
-  // For sandbox, accept any key that starts with sk_test_ or the demo key
-  if (!apiKey.startsWith("sk_test_") && apiKey !== "demo_key_lausd_sandbox") {
+  // For sandbox, accept any key that starts with sbox_test_ or the demo key
+  if (!apiKey.startsWith("sbox_test_") && apiKey !== "demo_key_lausd_sandbox") {
     return {
       valid: false,
-      error: "Invalid API key format. Sandbox keys should start with 'sk_test_'.",
+      error: "Invalid API key format. Sandbox keys should start with 'sbox_test_'.",
     };
   }
 

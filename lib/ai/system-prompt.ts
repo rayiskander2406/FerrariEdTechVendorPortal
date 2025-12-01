@@ -355,6 +355,7 @@ function buildVendorContextSection(context: VendorContext): string {
   if (context.vendor) {
     const v = context.vendor;
     sections.push("### Vendor Profile");
+    sections.push(`- **Vendor ID**: ${v.id}`);
     sections.push(`- **Name**: ${v.name}`);
     sections.push(`- **Contact**: ${v.contactName} (${v.contactEmail})`);
     sections.push(`- **Access Tier**: ${formatAccessTier(v.accessTier)}`);
@@ -362,6 +363,8 @@ function buildVendorContextSection(context: VendorContext): string {
     if (v.podsApplicationId) {
       sections.push(`- **PoDS Application ID**: ${v.podsApplicationId}`);
     }
+    sections.push("");
+    sections.push("**IMPORTANT**: When calling tools that require `vendor_id`, use: `" + v.id + "`");
     sections.push("");
   } else {
     sections.push("### Vendor Profile");

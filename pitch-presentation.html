@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAUSD Vendor Portal - Executive Presentation</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            lausd: {
+              blue: '#003DA5',
+              gold: '#FDB813',
+              light: '#E8F0FE',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .slide-transition { transition: all 0.3s ease-in-out; }
+    .typing-cursor::after {
+      content: '|';
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.5s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // ==========================================================================
+    // MOCK DATA
+    // ==========================================================================
+
+    const MOCK_TOKENIZED_STUDENTS = [
+      { id: "TKN_STU_8X9Y2Z3A", firstName: "Maria", lastName: "[TOKENIZED]", email: "TKN_STU_8X9Y2Z3A@relay.schoolday.lausd.net", grade: "09" },
+      { id: "TKN_STU_4B7C1D5E", firstName: "James", lastName: "[TOKENIZED]", email: "TKN_STU_4B7C1D5E@relay.schoolday.lausd.net", grade: "09" },
+      { id: "TKN_STU_2F8G3H6I", firstName: "Sofia", lastName: "[TOKENIZED]", email: "TKN_STU_2F8G3H6I@relay.schoolday.lausd.net", grade: "10" },
+      { id: "TKN_STU_9J4K7L1M", firstName: "David", lastName: "[TOKENIZED]", email: "TKN_STU_9J4K7L1M@relay.schoolday.lausd.net", grade: "10" },
+      { id: "TKN_STU_5N2P8Q3R", firstName: "Emma", lastName: "[TOKENIZED]", email: "TKN_STU_5N2P8Q3R@relay.schoolday.lausd.net", grade: "11" },
+    ];
+
+    const MOCK_AUDIT_LOGS = [
+      { id: "1", timestamp: new Date(Date.now() - 120000), action: "api.request", resourceType: "OneRoster", resourceId: "/students", details: { endpoint: "GET /students", responseTime: "145ms", recordsReturned: 50 } },
+      { id: "2", timestamp: new Date(Date.now() - 300000), action: "credentials.created", resourceType: "Sandbox", resourceId: "sb_demo_12345", details: { tier: "PRIVACY_SAFE", autoApproved: true } },
+      { id: "3", timestamp: new Date(Date.now() - 600000), action: "comm.sent", resourceType: "Email", resourceId: "TKN_STU_8X9Y2Z3A@relay...", details: { type: "email", relayed: true, template: "progress_update" } },
+      { id: "4", timestamp: new Date(Date.now() - 900000), action: "config.sso", resourceType: "SSO", resourceId: "Google SAML", details: { provider: "google", entityId: "https://acme-math.com/sso" } },
+      { id: "5", timestamp: new Date(Date.now() - 1800000), action: "pods.approved", resourceType: "PoDS-Lite", resourceId: "PODS-2024-00892", details: { tier: "PRIVACY_SAFE", autoApproved: true, questionsAnswered: 13 } },
+    ];
+
+    const PODS_LITE_QUESTIONS = [
+      { section: "Organization Info", questions: ["Legal company name", "Primary contact email", "Company website URL"] },
+      { section: "Application Details", questions: ["Application name", "Brief description", "Target grade levels"] },
+      { section: "Data Requirements", questions: ["What student data do you need?", "How will data be used?", "Data retention period"] },
+      { section: "Security & Compliance", questions: ["SOC 2 certification status", "Data encryption methods", "Incident response plan", "COPPA compliance confirmation"] },
+    ];
+
+    // ==========================================================================
+    // ICONS (inline SVG)
+    // ==========================================================================
+
+    const Icons = {
+      ChevronLeft: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
+      ChevronRight: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      Bot: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+      User: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+      Shield: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      Key: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>,
+      Database: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>,
+      Mail: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+      Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      Clock: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      Download: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      Send: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+      Play: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    };
+
+    // ==========================================================================
+    // SLIDE 1: Chat Interface
+    // ==========================================================================
+
+    function ChatInterfaceSlide() {
+      const [typedText, setTypedText] = useState("");
+      const fullText = "I'll help you get started with LAUSD integration. Since you're a new vendor, let me explain our privacy-first approach:\n\n**Tokenization** means your app receives functional student identifiers like `TKN_STU_8X9Y2Z` instead of real names or IDs. You get full integration capabilities while student PII stays protected.\n\nWould you like to:\n1. Complete the PoDS-Lite application (13 questions, ~5 min)\n2. Learn more about our three-tier privacy model\n3. See a demo of tokenized data";
+
+      useEffect(() => {
+        let i = 0;
+        const timer = setInterval(() => {
+          if (i < fullText.length) {
+            setTypedText(fullText.slice(0, i + 1));
+            i++;
+          } else {
+            clearInterval(timer);
+          }
+        }, 15);
+        return () => clearInterval(timer);
+      }, []);
+
+      return (
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="bg-lausd-blue px-6 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+              <Icons.Bot />
+            </div>
+            <div>
+              <h3 className="text-white font-semibold">LAUSD Integration Assistant</h3>
+              <p className="text-white/70 text-sm">AI-Powered Vendor Onboarding</p>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              <span className="text-white/70 text-sm">Online</span>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="p-6 space-y-4 bg-gray-50 min-h-[400px]">
+            {/* User message */}
+            <div className="flex justify-end">
+              <div className="bg-lausd-blue text-white px-4 py-3 rounded-2xl rounded-br-md max-w-md">
+                Hi, I'm from Acme Math and we want to integrate with LAUSD
+              </div>
+            </div>
+
+            {/* AI Response */}
+            <div className="flex gap-3">
+              <div className="w-8 h-8 bg-lausd-blue rounded-full flex items-center justify-center flex-shrink-0">
+                <Icons.Bot />
+              </div>
+              <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-md max-w-lg shadow-sm border border-gray-100">
+                <div className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
+                  {typedText.split('`').map((part, i) =>
+                    i % 2 === 1 ? <code key={i} className="bg-lausd-light text-lausd-blue px-1.5 py-0.5 rounded font-mono text-xs">{part}</code> : part
+                  )}
+                  {typedText.length < fullText.length && <span className="typing-cursor"></span>}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Suggestion Chips */}
+          <div className="px-6 py-4 border-t border-gray-200 bg-white">
+            <div className="flex flex-wrap gap-2 mb-4">
+              {["Start PoDS-Lite", "Explain tokenization", "Show demo data"].map((chip) => (
+                <button key={chip} className="px-4 py-2 bg-lausd-light text-lausd-blue rounded-full text-sm font-medium hover:bg-lausd-blue hover:text-white transition-colors">
+                  {chip}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ask about SSO, rostering, or compliance..."
+                className="flex-1 px-4 py-3 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-lausd-blue"
+              />
+              <button className="px-4 py-3 bg-lausd-blue text-white rounded-xl hover:bg-lausd-blue/90 transition-colors">
+                <Icons.Send />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================================================
+    // SLIDE 2: API Tester with Tokenized Data
+    // ==========================================================================
+
+    function ApiTesterSlide() {
+      const [isLoading, setIsLoading] = useState(true);
+
+      useEffect(() => {
+        const timer = setTimeout(() => setIsLoading(false), 1500);
+        return () => clearTimeout(timer);
+      }, []);
+
+      return (
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="bg-lausd-blue px-6 py-4">
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              <Icons.Database />
+              OneRoster API Tester
+            </h3>
+            <p className="text-white/70 text-sm">Test endpoints with tokenized LAUSD data</p>
+          </div>
+
+          <div className="p-6">
+            {/* Endpoint Selector */}
+            <div className="flex gap-4 mb-6">
+              <select className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-lausd-blue bg-white">
+                <option>GET /students - Fetch student roster</option>
+                <option>GET /classes - Fetch class enrollments</option>
+                <option>GET /teachers - Fetch teacher roster</option>
+                <option>GET /demographics - Fetch demographics</option>
+              </select>
+              <button className="px-6 py-3 bg-lausd-blue text-white rounded-xl font-medium hover:bg-lausd-blue/90 transition-colors flex items-center gap-2">
+                <Icons.Play />
+                Execute
+              </button>
+            </div>
+
+            {/* Response */}
+            <div className="bg-gray-900 rounded-xl overflow-hidden">
+              <div className="px-4 py-2 bg-gray-800 flex items-center justify-between">
+                <span className="text-gray-400 text-sm font-mono">Response</span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">200 OK</span>
+                  <span className="text-gray-500 text-xs">145ms</span>
+                </div>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-lausd-blue border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : (
+                  <pre className="text-sm text-gray-300 font-mono">
+{`{
+  "students": [`}
+                    {MOCK_TOKENIZED_STUDENTS.map((s, i) => (
+                      <span key={s.id}>
+{`
+    {
+      "sourcedId": "`}<span className="text-yellow-400">{s.id}</span>{`",
+      "givenName": "${s.firstName}",
+      "familyName": "`}<span className="text-red-400">{s.lastName}</span>{`",
+      "email": "`}<span className="text-yellow-400">{s.email}</span>{`",
+      "grade": "${s.grade}"
+    }`}{i < MOCK_TOKENIZED_STUDENTS.length - 1 ? ',' : ''}
+                      </span>
+                    ))}
+{`
+  ],
+  "totalCount": 6600,
+  "pageSize": 5
+}`}
+                  </pre>
+                )}
+              </div>
+            </div>
+
+            {/* Callout */}
+            <div className="mt-4 p-4 bg-lausd-light rounded-xl border border-lausd-blue/20">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-lausd-blue rounded-full flex items-center justify-center flex-shrink-0">
+                  <Icons.Shield />
+                </div>
+                <div>
+                  <p className="font-semibold text-lausd-blue">Privacy-Safe Response</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Student IDs are <span className="font-mono bg-white px-1 rounded">TKN_STU_*</span> tokens.
+                    Last names show <span className="font-mono bg-white px-1 rounded text-red-600">[TOKENIZED]</span>.
+                    Emails route through LAUSD relay. <strong>Zero PII exposed.</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================================================
+    // SLIDE 3: PoDS-Lite Form
+    // ==========================================================================
+
+    function PodsLiteSlide() {
+      const [currentSection, setCurrentSection] = useState(0);
+
+      return (
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="bg-lausd-blue px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-semibold">PoDS-Lite Application</h3>
+                <p className="text-white/70 text-sm">Simplified Privacy Review (13 questions)</p>
+              </div>
+              <div className="text-right">
+                <p className="text-white font-bold text-2xl">13</p>
+                <p className="text-white/70 text-xs">vs 71 full PoDS</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Progress</span>
+              <span className="text-sm text-gray-500">Section {currentSection + 1} of 4</span>
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-lausd-blue transition-all duration-500"
+                style={{ width: `${((currentSection + 1) / 4) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Sections */}
+          <div className="p-6">
+            <div className="flex gap-2 mb-6">
+              {PODS_LITE_QUESTIONS.map((section, i) => (
+                <button
+                  key={section.section}
+                  onClick={() => setCurrentSection(i)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    i === currentSection
+                      ? 'bg-lausd-blue text-white'
+                      : i < currentSection
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {i < currentSection && <span className="mr-1">✓</span>}
+                  {section.section}
+                </button>
+              ))}
+            </div>
+
+            {/* Questions */}
+            <div className="space-y-4">
+              {PODS_LITE_QUESTIONS[currentSection].questions.map((q, i) => (
+                <div key={q} className="animate-slide-up" style={{ animationDelay: `${i * 100}ms` }}>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {q} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={`Enter ${q.toLowerCase()}`}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-lausd-blue"
+                    defaultValue={currentSection === 0 && i === 0 ? "Acme Math, Inc." : ""}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              <Icons.Clock /> Estimated time: ~5 minutes
+            </p>
+            <div className="flex gap-3">
+              <button className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                Save Draft
+              </button>
+              <button
+                onClick={() => setCurrentSection(Math.min(3, currentSection + 1))}
+                className="px-6 py-2 bg-lausd-blue text-white rounded-lg font-medium hover:bg-lausd-blue/90 transition-colors"
+              >
+                {currentSection === 3 ? "Submit for Auto-Approval" : "Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================================================
+    // SLIDE 4: Communication Test (Tokenized Relay)
+    // ==========================================================================
+
+    function CommTestSlide() {
+      const [sent, setSent] = useState(false);
+
+      return (
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="bg-lausd-blue px-6 py-4">
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              <Icons.Mail />
+              Communication Gateway Test
+            </h3>
+            <p className="text-white/70 text-sm">Send messages to parents via tokenized relay</p>
+          </div>
+
+          <div className="p-6">
+            {/* Flow Diagram */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-xl">
+              <p className="text-sm font-medium text-gray-700 mb-4">How the Relay Works:</p>
+              <div className="flex items-center justify-between">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-lausd-light rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <span className="text-2xl">🏢</span>
+                  </div>
+                  <p className="text-xs font-medium text-gray-700">Your App</p>
+                  <p className="text-xs text-gray-500 mt-1 font-mono">Sends to token</p>
+                </div>
+                <div className="flex-1 mx-4">
+                  <div className="h-0.5 bg-lausd-blue relative">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2">
+                      <svg className="w-6 h-6 text-lausd-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-lausd-blue rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <span className="text-2xl">🔒</span>
+                  </div>
+                  <p className="text-xs font-medium text-gray-700">LAUSD Relay</p>
+                  <p className="text-xs text-gray-500 mt-1">Translates & logs</p>
+                </div>
+                <div className="flex-1 mx-4">
+                  <div className="h-0.5 bg-green-500 relative">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2">
+                      <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <span className="text-2xl">👨‍👩‍👧</span>
+                  </div>
+                  <p className="text-xs font-medium text-gray-700">Parent</p>
+                  <p className="text-xs text-gray-500 mt-1">Receives message</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              {/* Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Recipient (Tokenized)</label>
+                  <input
+                    type="text"
+                    value="TKN_STU_8X9Y2Z3A@relay.schoolday.lausd.net"
+                    readOnly
+                    className="w-full px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-xl text-sm font-mono"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">You never see the real email address</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Message Type</label>
+                  <select className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-lausd-blue">
+                    <option>Progress Update</option>
+                    <option>Assignment Reminder</option>
+                    <option>Achievement Notification</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                  <textarea
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-lausd-blue"
+                    rows={3}
+                    defaultValue="Maria completed Chapter 5: Algebra Basics with a score of 92%!"
+                  />
+                </div>
+                <button
+                  onClick={() => setSent(true)}
+                  className="w-full px-6 py-3 bg-lausd-blue text-white rounded-xl font-medium hover:bg-lausd-blue/90 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Icons.Send />
+                  Send Test Message
+                </button>
+              </div>
+
+              {/* Result */}
+              <div>
+                {sent ? (
+                  <div className="h-full bg-green-50 rounded-xl border border-green-200 p-6 flex flex-col items-center justify-center animate-slide-up">
+                    <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <p className="font-semibold text-green-700 text-lg">Message Relayed!</p>
+                    <div className="mt-4 text-sm text-gray-600 space-y-2 w-full">
+                      <div className="flex justify-between py-2 border-b border-green-200">
+                        <span className="text-gray-500">Status</span>
+                        <span className="font-medium text-green-700">Delivered</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-green-200">
+                        <span className="text-gray-500">Relay ID</span>
+                        <span className="font-mono text-xs">RLY_29X8K4M2</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-green-200">
+                        <span className="text-gray-500">Audit Logged</span>
+                        <span className="text-green-600">✓ Yes</span>
+                      </div>
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-500">PII Exposed</span>
+                        <span className="font-bold text-green-700">None</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full bg-gray-50 rounded-xl border border-gray-200 p-6 flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                      <Icons.Mail />
+                    </div>
+                    <p className="text-gray-500">Send a test message to see the relay in action</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================================================
+    // SLIDE 5: Audit Log Viewer
+    // ==========================================================================
+
+    function AuditLogSlide() {
+      const [expanded, setExpanded] = useState(null);
+
+      const getActionStyle = (action) => {
+        const styles = {
+          'api.request': { bg: 'bg-blue-100', text: 'text-blue-700', icon: Icons.Database },
+          'credentials.created': { bg: 'bg-purple-100', text: 'text-purple-700', icon: Icons.Key },
+          'comm.sent': { bg: 'bg-green-100', text: 'text-green-700', icon: Icons.Mail },
+          'config.sso': { bg: 'bg-orange-100', text: 'text-orange-700', icon: Icons.Shield },
+          'pods.approved': { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: Icons.Check },
+        };
+        return styles[action] || { bg: 'bg-gray-100', text: 'text-gray-700', icon: Icons.Clock };
+      };
+
+      const formatTime = (date) => {
+        const diff = Date.now() - date.getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 60) return `${mins}m ago`;
+        return `${Math.floor(mins / 60)}h ago`;
+      };
+
+      return (
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="bg-lausd-blue px-6 py-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <Icons.Clock />
+                Audit Log
+              </h3>
+              <p className="text-white/70 text-sm">Complete data access trail for compliance</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-sm font-medium hover:bg-white/30 transition-colors flex items-center gap-1">
+                <Icons.Download />
+                CSV
+              </button>
+              <button className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-sm font-medium hover:bg-white/30 transition-colors flex items-center gap-1">
+                <Icons.Download />
+                JSON
+              </button>
+            </div>
+          </div>
+
+          {/* Summary Bar */}
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                <strong className="text-gray-900">{MOCK_AUDIT_LOGS.length}</strong> events
+              </span>
+              <span className="text-sm text-gray-600">
+                Last 30 minutes
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {['api.request', 'credentials.created', 'comm.sent'].map(action => {
+                const style = getActionStyle(action);
+                return (
+                  <span key={action} className={`px-2 py-1 rounded text-xs font-medium ${style.bg} ${style.text}`}>
+                    {action.split('.')[1]}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Log Entries */}
+          <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+            {MOCK_AUDIT_LOGS.map((log, index) => {
+              const style = getActionStyle(log.action);
+              const Icon = style.icon;
+              const isExpanded = expanded === log.id;
+
+              return (
+                <div
+                  key={log.id}
+                  className="animate-slide-up"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div
+                    className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => setExpanded(isExpanded ? null : log.id)}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${style.bg}`}>
+                      <Icon />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${style.bg} ${style.text}`}>
+                          {log.action}
+                        </span>
+                        <span className="text-xs text-gray-500">{log.resourceType}</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1 truncate font-mono">{log.resourceId}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">{formatTime(log.timestamp)}</p>
+                      <svg className={`w-4 h-4 text-gray-400 mt-1 ml-auto transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="px-6 pb-4 pl-20">
+                      <div className="bg-gray-900 rounded-lg p-4">
+                        <pre className="text-xs text-gray-300 font-mono">
+                          {JSON.stringify(log.details, null, 2)}
+                        </pre>
+                      </div>
+                      <div className="mt-2 flex gap-4 text-xs text-gray-500">
+                        <span>IP: 10.0.0.45</span>
+                        <span>User Agent: Claude Integration Portal</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-lausd-light border-t border-lausd-blue/20">
+            <div className="flex items-center gap-3">
+              <Icons.Shield />
+              <p className="text-sm text-lausd-blue">
+                <strong>Compliance Ready:</strong> Every data access is logged with timestamp, action type, resource, and requester details. Export anytime for auditors.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================================================
+    // MAIN PRESENTATION
+    // ==========================================================================
+
+    function Presentation() {
+      const [currentSlide, setCurrentSlide] = useState(0);
+
+      const slides = [
+        {
+          title: "AI-Guided Self-Service",
+          subtitle: "Vendors interact with an AI assistant, not a help desk queue",
+          component: ChatInterfaceSlide,
+          speakerNote: "Vendors can ask natural questions and get guided through the entire onboarding process."
+        },
+        {
+          title: "Zero PII Exposure",
+          subtitle: "Functional data with tokenized identifiers",
+          component: ApiTesterSlide,
+          speakerNote: "This is exactly what vendors see—student IDs are tokens, last names are masked, emails route through our relay."
+        },
+        {
+          title: "4 Weeks → 4 Minutes",
+          subtitle: "Simplified 13-question PoDS-Lite vs. 71-question full review",
+          component: PodsLiteSlide,
+          speakerNote: "80% of vendors only need tokenized data. PoDS-Lite auto-approves in minutes."
+        },
+        {
+          title: "Parent Communication Without Exposure",
+          subtitle: "Vendors message parents via tokenized relay",
+          component: CommTestSlide,
+          speakerNote: "A math app can send 'Your child completed Chapter 5' without ever knowing the parent's actual email."
+        },
+        {
+          title: "Audit-Ready Compliance",
+          subtitle: "Complete data access trail for FERPA/COPPA/SOPIPA",
+          component: AuditLogSlide,
+          speakerNote: "When auditors ask 'who accessed what?'—you have the answer instantly."
+        },
+      ];
+
+      const CurrentComponent = slides[currentSlide].component;
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200">
+          {/* Top Bar */}
+          <div className="bg-lausd-blue text-white py-4 px-8">
+            <div className="max-w-6xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-lausd-gold rounded-lg flex items-center justify-center font-bold text-lausd-blue text-xl">
+                  LA
+                </div>
+                <div>
+                  <h1 className="font-bold text-lg">LAUSD Vendor Integration Portal</h1>
+                  <p className="text-white/70 text-sm">Privacy by Design</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {slides.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentSlide(i)}
+                    className={`w-3 h-3 rounded-full transition-colors ${
+                      i === currentSlide ? 'bg-lausd-gold' : 'bg-white/30 hover:bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Slide Header */}
+          <div className="text-center py-8">
+            <p className="text-lausd-blue font-medium text-sm uppercase tracking-wider mb-2">
+              Feature {currentSlide + 1} of {slides.length}
+            </p>
+            <h2 className="text-4xl font-bold text-gray-900 mb-2">{slides[currentSlide].title}</h2>
+            <p className="text-xl text-gray-600">{slides[currentSlide].subtitle}</p>
+          </div>
+
+          {/* Slide Content */}
+          <div className="px-8 pb-8">
+            <div className="max-w-6xl mx-auto">
+              <CurrentComponent />
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-4 px-8">
+            <div className="max-w-6xl mx-auto flex items-center justify-between">
+              <button
+                onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+                disabled={currentSlide === 0}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <Icons.ChevronLeft />
+                Previous
+              </button>
+
+              {/* Speaker Note */}
+              <div className="flex-1 mx-8 px-4 py-2 bg-lausd-light rounded-lg">
+                <p className="text-sm text-lausd-blue">
+                  <strong>Speaker Note:</strong> {slides[currentSlide].speakerNote}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))}
+                disabled={currentSlide === slides.length - 1}
+                className="flex items-center gap-2 px-4 py-2 bg-lausd-blue text-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-lausd-blue/90 transition-colors"
+              >
+                Next
+                <Icons.ChevronRight />
+              </button>
+            </div>
+          </div>
+
+          {/* Keyboard Navigation Hint */}
+          <div className="fixed bottom-20 right-8 text-xs text-gray-400">
+            Use ← → arrow keys to navigate
+          </div>
+        </div>
+      );
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') {
+        document.querySelector('[data-next]')?.click();
+      } else if (e.key === 'ArrowLeft') {
+        document.querySelector('[data-prev]')?.click();
+      }
+    });
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Presentation />);
+  </script>
+</body>
+</html>

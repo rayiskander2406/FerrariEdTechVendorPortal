@@ -103,7 +103,7 @@ This significantly improves user experience by pre-filling the form. ALWAYS extr
 
 Prerequisites:
 - Vendor must have an APPROVED PoDS status
-- Creates API key (sk_test_xxx) and secret
+- Creates API key (sbox_test_xxx) and secret
 - Credentials valid for 90 days
 
 Use this tool when:
@@ -455,7 +455,7 @@ Returns timestamped list of actions with details.`,
     description: `Retrieve and display the sandbox credentials for a vendor.
 
 Returns:
-- API Key (sk_test_xxx format)
+- API Key (sbox_test_xxx format)
 - API Secret (displayed securely)
 - Base URL for API calls
 - Expiration date
@@ -581,6 +581,56 @@ Always encourage Privacy-Safe first - only use this if the vendor has a clear, s
       required: ["vendor_id", "target_tier", "justification"],
     },
   },
+
+  // -------------------------------------------------------------------------
+  // 13. update_endpoints - Modify allowed OneRoster endpoints
+  // -------------------------------------------------------------------------
+  {
+    name: "update_endpoints",
+    description: `Update the allowed OneRoster API endpoints for a vendor's sandbox credentials.
+
+Use this tool when:
+- A vendor needs access to additional OneRoster endpoints after initial setup
+- A vendor wants to reduce their endpoint access for security
+- Modifying the scope of data a vendor can access
+
+Modes:
+- "add": Add new endpoints to existing access (preserves current endpoints)
+- "replace": Replace all endpoints with the new list
+
+Available Endpoints:
+- /users: Students and teachers (tokenized)
+- /classes: Class sections
+- /courses: Curriculum
+- /enrollments: Student-class relationships
+- /orgs: Schools and district
+- /academicSessions: Terms and grading periods
+- /demographics: Student demographics (requires elevated access)
+
+Returns the updated list of allowed endpoints.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        vendor_id: {
+          type: "string",
+          description: "The UUID of the vendor whose endpoints to update",
+        },
+        endpoints: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Array of OneRoster endpoints to allow (e.g., ['/users', '/classes', '/enrollments'])",
+        },
+        mode: {
+          type: "string",
+          enum: ["add", "replace"],
+          description:
+            "Update mode: 'add' appends to existing endpoints, 'replace' overwrites all endpoints (default: 'add')",
+        },
+      },
+      required: ["vendor_id", "endpoints"],
+    },
+  },
 ];
 
 // =============================================================================
@@ -647,19 +697,10 @@ export function validateToolInput(
 // TYPE EXPORTS
 // =============================================================================
 
-export type ToolName =
-  | "lookup_pods"
-  | "submit_pods_lite"
-  | "provision_sandbox"
-  | "configure_sso"
-  | "test_oneroster"
-  | "configure_lti"
-  | "send_test_message"
-  | "submit_app"
-  | "get_audit_logs"
-  | "get_credentials"
-  | "check_status"
-  | "request_upgrade";
+// Re-export ToolId from centralized config as ToolName for backwards compatibility
+// CONFIG-03: AI Tool Names centralization - see lib/config/ai-tools.ts
+import { type ToolId } from "@/lib/config/ai-tools";
+export type ToolName = ToolId;
 
 export interface LookupPodsInput {
   query: string;
@@ -749,6 +790,12 @@ export interface RequestUpgradeInput {
   retention_period?: number;
 }
 
+export interface UpdateEndpointsInput {
+  vendor_id: string;
+  endpoints: string[];
+  mode?: "add" | "replace";
+}
+
 export type ToolInput =
   | LookupPodsInput
   | SubmitPodsLiteInput
@@ -761,4 +808,5 @@ export type ToolInput =
   | GetAuditLogsInput
   | GetCredentialsInput
   | CheckStatusInput
-  | RequestUpgradeInput;
+  | RequestUpgradeInput
+  | UpdateEndpointsInput;

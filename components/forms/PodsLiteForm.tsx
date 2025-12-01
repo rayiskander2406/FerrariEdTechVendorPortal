@@ -283,14 +283,11 @@ function generateVendorCredentials(
   // OneRoster API credentials
   if (selectedIntegrations.includes("ONEROSTER_API")) {
     // Convert form data elements (USERS, CLASSES, etc.) to OneRoster endpoints (/users, /classes, etc.)
-    console.log("[generateVendorCredentials] formData.dataElementsRequested:", formData.dataElementsRequested);
     const mappedEndpoints = dataElementsToEndpoints(formData.dataElementsRequested);
-    console.log("[generateVendorCredentials] mappedEndpoints (before fallback):", mappedEndpoints);
     const endpoints = mappedEndpoints ?? [...DEFAULT_ONEROSTER_ENDPOINTS];
-    console.log("[generateVendorCredentials] final endpoints:", endpoints);
 
     credentials.oneRoster = {
-      apiKey: `sk_test_${randomHex(24)}`,
+      apiKey: `sbox_test_${randomHex(24)}`,
       apiSecret: `sk_secret_${randomHex(32)}`,
       baseUrl: "https://sandbox.lausd-data.schoolday.com/ims/oneroster/v1p2",
       vendorId,
@@ -385,9 +382,6 @@ function generateVendorCredentials(
 // =============================================================================
 
 export function PodsLiteForm({ onSubmit, onCancel, onTestApi, prefill }: PodsLiteFormProps) {
-  // DEBUG: Log prefill prop
-  console.log("[PodsLiteForm] Received prefill prop:", prefill);
-
   // Generate demo data once on mount using useMemo
   const demoData = useMemo(() => generateDemoData(), []);
   const formId = useId();

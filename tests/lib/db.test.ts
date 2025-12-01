@@ -16,6 +16,7 @@ import {
   createSandbox,
   getSandbox,
   updateSandboxLastUsed,
+  updateSandboxEndpoints,
   revokeSandbox,
   logAuditEvent,
   getAuditLogs,
@@ -31,10 +32,16 @@ import type { PodsLiteInput } from '@/lib/types';
 // FIXTURES
 // =============================================================================
 
+// Generate unique email for each test to avoid unique constraint violations
+let testEmailCounter = 0;
+function uniqueEmail(): string {
+  return `test-${Date.now()}-${++testEmailCounter}@vendor.com`;
+}
+
 function createMockPodsLiteInput(overrides: Partial<PodsLiteInput> = {}): PodsLiteInput {
   return {
     vendorName: 'Test Vendor',
-    contactEmail: 'test@vendor.com',
+    contactEmail: overrides.contactEmail ?? uniqueEmail(),
     contactName: 'Test User',
     contactPhone: '555-0100',
     applicationName: 'Test App',
@@ -62,8 +69,9 @@ function createMockPodsLiteInput(overrides: Partial<PodsLiteInput> = {}): PodsLi
 // =============================================================================
 
 describe('Database Configuration', () => {
-  it('should be in mock mode', () => {
-    expect(isMockMode()).toBe(true);
+  it('should not be in mock mode (using real Prisma)', () => {
+    // isMockMode() always returns false now that we use Prisma
+    expect(isMockMode()).toBe(false);
   });
 });
 
@@ -80,7 +88,7 @@ describe('Vendor Operations', () => {
 
       expect(vendor.id).toBeDefined();
       expect(vendor.name).toBe('Test Vendor');
-      expect(vendor.contactEmail).toBe('test@vendor.com');
+      expect(vendor.contactEmail).toMatch(/@vendor\.com$/);  // Unique emails
       expect(vendor.accessTier).toBe('PRIVACY_SAFE');
       expect(vendor.podsStatus).toBe('APPROVED');
     });
@@ -141,7 +149,7 @@ describe('Vendor Operations', () => {
       const sensitiveElements: DataElementType[] = ['LAST_NAME', 'EMAIL', 'PHONE', 'ADDRESS', 'DEMOGRAPHICS', 'SPECIAL_ED'];
 
       for (const element of sensitiveElements) {
-        clearAllStores();
+        await clearAllStores();
         const vendor = await createVendor({
           podsLiteInput: createMockPodsLiteInput({
             dataElementsRequested: ['STUDENT_ID', element],
@@ -274,7 +282,7 @@ describe('Sandbox Operations', () => {
 
       expect(sandbox.id).toBeDefined();
       expect(sandbox.vendorId).toBe(vendor.id);
-      expect(sandbox.apiKey).toMatch(/^sk_test_/);
+      expect(sandbox.apiKey).toMatch(/^sbox_test_/);
       expect(sandbox.apiSecret.length).toBe(64);
       expect(sandbox.status).toBe('ACTIVE');
       expect(sandbox.environment).toBe('sandbox');
@@ -389,6 +397,164 @@ describe('Sandbox Operations', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('updateSandboxEndpoints', () => {
+    it('should add new endpoints in add mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const originalSandbox = await getSandbox(vendor.id);
+      const originalCount = originalSandbox?.allowedEndpoints.length ?? 0;
+
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['/academicSessions'],
+        'add'
+      );
+
+      expect(updated).not.toBeNull();
+      expect(updated?.allowedEndpoints).toContain('/academicSessions');
+      expect(updated?.allowedEndpoints.length).toBeGreaterThanOrEqual(originalCount);
+    });
+
+    it('should replace all endpoints in replace mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const newEndpoints = ['/users', '/classes'];
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        newEndpoints,
+        'replace'
+      );
+
+      expect(updated).not.toBeNull();
+      expect(updated?.allowedEndpoints).toEqual(newEndpoints);
+    });
+
+    it('should default to add mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const originalSandbox = await getSandbox(vendor.id);
+      const originalEndpoints = originalSandbox?.allowedEndpoints ?? [];
+
+      const updated = await updateSandboxEndpoints(vendor.id, ['/demographics']);
+
+      expect(updated).not.toBeNull();
+      // Should have all original endpoints plus /demographics
+      for (const ep of originalEndpoints) {
+        expect(updated?.allowedEndpoints).toContain(ep);
+      }
+      expect(updated?.allowedEndpoints).toContain('/demographics');
+    });
+
+    it('should deduplicate endpoints in add mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      // Try to add an endpoint that already exists
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['/users', '/users', '/classes'],
+        'add'
+      );
+
+      expect(updated).not.toBeNull();
+      // Count occurrences of /users - should only appear once
+      const usersCount = updated?.allowedEndpoints.filter(ep => ep === '/users').length;
+      expect(usersCount).toBe(1);
+    });
+
+    it('should validate and normalize endpoint paths', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      // Test with endpoints without leading slash
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['users', 'classes'],
+        'replace'
+      );
+
+      expect(updated).not.toBeNull();
+      expect(updated?.allowedEndpoints).toContain('/users');
+      expect(updated?.allowedEndpoints).toContain('/classes');
+    });
+
+    it('should return null for non-existent vendor', async () => {
+      const result = await updateSandboxEndpoints(
+        'non-existent-vendor',
+        ['/users'],
+        'add'
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for vendor without sandbox', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      // Don't create sandbox
+
+      const result = await updateSandboxEndpoints(
+        vendor.id,
+        ['/users'],
+        'add'
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should log audit event when endpoints updated', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      await updateSandboxEndpoints(vendor.id, ['/demographics'], 'add');
+
+      const logs = await getAuditLogs(vendor.id);
+      const endpointUpdateLog = logs.find(
+        log => log.action === 'SANDBOX_ENDPOINTS_UPDATED'
+      );
+
+      expect(endpointUpdateLog).toBeDefined();
+      expect(endpointUpdateLog?.details).toHaveProperty('mode', 'add');
+      expect(endpointUpdateLog?.details).toHaveProperty('previousEndpoints');
+      expect(endpointUpdateLog?.details).toHaveProperty('newEndpoints');
+    });
+
+    it('should fall back to defaults for invalid endpoints', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      // Try to set only invalid endpoints
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['/invalid', '/not-real'],
+        'replace'
+      );
+
+      expect(updated).not.toBeNull();
+      // Should fall back to default endpoints since all provided were invalid
+      expect(updated?.allowedEndpoints.length).toBeGreaterThan(0);
+      expect(updated?.allowedEndpoints).toContain('/users');
+    });
+  });
 });
 
 // =============================================================================
@@ -398,8 +564,13 @@ describe('Sandbox Operations', () => {
 describe('Audit Log Operations', () => {
   describe('logAuditEvent', () => {
     it('should log audit event', async () => {
+      // Create a vendor first (FK constraint)
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
       const log = await logAuditEvent({
-        vendorId: 'vendor-123',
+        vendorId: vendor.id,
         action: 'TEST_ACTION',
         resourceType: 'test',
         resourceId: 'resource-456',
@@ -407,7 +578,7 @@ describe('Audit Log Operations', () => {
       });
 
       expect(log.id).toBeDefined();
-      expect(log.vendorId).toBe('vendor-123');
+      expect(log.vendorId).toBe(vendor.id);
       expect(log.action).toBe('TEST_ACTION');
       expect(log.resourceType).toBe('test');
       expect(log.resourceId).toBe('resource-456');
@@ -416,8 +587,12 @@ describe('Audit Log Operations', () => {
     });
 
     it('should include optional IP and user agent', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
       const log = await logAuditEvent({
-        vendorId: 'vendor-123',
+        vendorId: vendor.id,
         action: 'LOGIN',
         resourceType: 'session',
         ipAddress: '192.168.1.1',
@@ -431,76 +606,104 @@ describe('Audit Log Operations', () => {
 
   describe('getAuditLogs', () => {
     it('should return logs for vendor', async () => {
+      const vendor1 = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'Vendor 1' }),
+      });
+      const vendor2 = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'Vendor 2' }),
+      });
+
       await logAuditEvent({
-        vendorId: 'vendor-123',
+        vendorId: vendor1.id,
         action: 'ACTION_1',
         resourceType: 'test',
       });
       await logAuditEvent({
-        vendorId: 'vendor-123',
+        vendorId: vendor1.id,
         action: 'ACTION_2',
         resourceType: 'test',
       });
       await logAuditEvent({
-        vendorId: 'other-vendor',
+        vendorId: vendor2.id,
         action: 'ACTION_3',
         resourceType: 'test',
       });
 
-      const logs = await getAuditLogs('vendor-123');
+      const logs = await getAuditLogs(vendor1.id);
 
-      expect(logs).toHaveLength(2);
-      expect(logs.every((l) => l.vendorId === 'vendor-123')).toBe(true);
+      // Vendor creation also logs, so we check for at least our 2 actions
+      const testLogs = logs.filter((l) => l.action.startsWith('ACTION_'));
+      expect(testLogs).toHaveLength(2);
+      expect(logs.every((l) => l.vendorId === vendor1.id)).toBe(true);
     });
 
     it('should return logs in reverse chronological order', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
       await logAuditEvent({
-        vendorId: 'vendor-123',
+        vendorId: vendor.id,
         action: 'FIRST',
         resourceType: 'test',
       });
       await new Promise((resolve) => setTimeout(resolve, 10));
       await logAuditEvent({
-        vendorId: 'vendor-123',
+        vendorId: vendor.id,
         action: 'SECOND',
         resourceType: 'test',
       });
 
-      const logs = await getAuditLogs('vendor-123');
+      const logs = await getAuditLogs(vendor.id);
+      const testLogs = logs.filter((l) => ['FIRST', 'SECOND'].includes(l.action));
 
-      expect(logs[0]?.action).toBe('SECOND');
-      expect(logs[1]?.action).toBe('FIRST');
+      expect(testLogs[0]?.action).toBe('SECOND');
+      expect(testLogs[1]?.action).toBe('FIRST');
     });
 
     it('should respect limit parameter', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+
       for (let i = 0; i < 10; i++) {
         await logAuditEvent({
-          vendorId: 'vendor-123',
+          vendorId: vendor.id,
           action: `ACTION_${i}`,
           resourceType: 'test',
         });
       }
 
-      const logs = await getAuditLogs('vendor-123', 5);
+      const logs = await getAuditLogs(vendor.id, 5);
 
       expect(logs).toHaveLength(5);
     });
 
     it('should return empty array for vendor with no logs', async () => {
-      const logs = await getAuditLogs('no-logs-vendor');
+      // Create a vendor but don't log anything manually
+      // (createVendor logs automatically, so we need a different approach)
+      // Query for a non-existent vendor ID
+      const logs = await getAuditLogs('non-existent-vendor-id');
       expect(logs).toEqual([]);
     });
   });
 
   describe('getAllAuditLogs', () => {
     it('should return all logs', async () => {
+      const vendor1 = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'V1' }),
+      });
+      const vendor2 = await createVendor({
+        podsLiteInput: createMockPodsLiteInput({ vendorName: 'V2' }),
+      });
+
       await logAuditEvent({
-        vendorId: 'vendor-1',
+        vendorId: vendor1.id,
         action: 'ACTION_1',
         resourceType: 'test',
       });
       await logAuditEvent({
-        vendorId: 'vendor-2',
+        vendorId: vendor2.id,
         action: 'ACTION_2',
         resourceType: 'test',
       });
@@ -524,19 +727,19 @@ describe('Audit Log Operations', () => {
 describe('Database Utilities', () => {
   describe('clearAllStores', () => {
     it('should clear all data', async () => {
-      await createVendor({
+      const vendor = await createVendor({
         podsLiteInput: createMockPodsLiteInput(),
       });
       await logAuditEvent({
-        vendorId: 'test',
+        vendorId: vendor.id,  // Use actual vendor ID for FK constraint
         action: 'TEST',
         resourceType: 'test',
       });
 
-      clearAllStores();
+      await clearAllStores();
 
       const vendors = await listVendors();
-      const stats = getDbStats();
+      const stats = await getDbStats();
 
       expect(vendors).toEqual([]);
       expect(stats.vendors).toBe(0);
@@ -552,7 +755,7 @@ describe('Database Utilities', () => {
       });
       await createSandbox(vendor.id);
 
-      const stats = getDbStats();
+      const stats = await getDbStats();
 
       expect(stats.vendors).toBe(1);
       expect(stats.sandboxes).toBe(1);

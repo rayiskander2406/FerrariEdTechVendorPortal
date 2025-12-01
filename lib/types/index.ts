@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// Import SSO provider enum from centralized config (CONFIG-02: SSO Providers Centralization)
+// This ensures single source of truth - see lib/config/sso.ts
+import { SsoProviderEnum } from "@/lib/config/sso";
+
 // =============================================================================
 // ENUMS
 // =============================================================================
@@ -56,7 +60,8 @@ export type IntegrationMethod = z.infer<typeof IntegrationMethodEnum>;
 export const IntegrationTypeEnum = z.enum(["SSO", "ONEROSTER", "LTI", "COMMUNICATION"]);
 export type IntegrationType = z.infer<typeof IntegrationTypeEnum>;
 
-export const SsoProviderEnum = z.enum(["CLEVER", "CLASSLINK", "GOOGLE"]);
+// Re-export SsoProviderEnum from config for backwards compatibility
+export { SsoProviderEnum };
 export type SsoProvider = z.infer<typeof SsoProviderEnum>;
 
 export const IntegrationStatusEnum = z.enum([
@@ -189,6 +194,23 @@ export const SandboxCredentialsSchema = z.object({
   allowedEndpoints: z.array(z.string()),
 });
 export type SandboxCredentials = z.infer<typeof SandboxCredentialsSchema>;
+
+// =============================================================================
+// PODS APPLICATION (Stored in lib/db - HARD-04 unification)
+// =============================================================================
+
+export const PodsApplicationSchema = z.object({
+  id: z.string(),
+  vendorName: z.string(),
+  applicationName: z.string(),
+  contactEmail: z.string().email(),
+  status: PodsStatusEnum,
+  accessTier: AccessTierEnum,
+  submittedAt: z.date().nullable(),
+  reviewedAt: z.date().nullable(),
+  expiresAt: z.date().nullable(),
+});
+export type PodsApplication = z.infer<typeof PodsApplicationSchema>;
 
 // =============================================================================
 // INTEGRATION-SPECIFIC CREDENTIALS

@@ -10,6 +10,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
+import React from "react";
+import { VendorProvider } from "@/lib/contexts";
 
 // =============================================================================
 // MOCK SETUP
@@ -47,6 +49,18 @@ vi.mock("@/lib/config/forms", () => ({
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/**
+ * Wrapper for renderHook that provides VendorProvider context
+ * Required since useChat now uses VendorProvider (HARD-01)
+ */
+function createWrapper() {
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return React.createElement(VendorProvider, null, children);
+  };
+}
+
+const wrapper = createWrapper();
 
 /**
  * Create a mock SSE stream response
@@ -125,7 +139,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -150,7 +164,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Check my status");
@@ -175,7 +189,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Test API");
@@ -198,7 +212,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Do something");
@@ -218,7 +232,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -251,7 +265,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       );
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -278,7 +292,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Start onboarding");
@@ -298,7 +312,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Setup SSO");
@@ -319,7 +333,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Submit PoDS");
@@ -339,7 +353,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Multiple forms");
@@ -366,7 +380,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -390,7 +404,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -410,7 +424,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -435,7 +449,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
         .mockResolvedValueOnce(createMockStreamResponse(events2));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("First");
@@ -485,7 +499,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       );
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       act(() => {
         result.current.sendMessage("Hi");
@@ -506,7 +520,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -522,7 +536,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -558,7 +572,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       });
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       // Send first message and wait for loading to start
       await act(async () => {
@@ -594,7 +608,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockRejectedValueOnce(new Error("Failed to fetch"));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -617,7 +631,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       );
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -643,7 +657,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       });
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -659,7 +673,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockRejectedValueOnce(new Error("Stream failed"));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -677,7 +691,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockRejectedValueOnce(new Error("Some error"));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -706,7 +720,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         result.current.sendMessage("Hello");
@@ -739,7 +753,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       );
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         result.current.sendMessage("Hi");
@@ -758,7 +772,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
         .mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("First");
@@ -784,7 +798,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -802,7 +816,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");
@@ -828,7 +842,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
   describe("Vendor State Management", () => {
     it("should initialize with default vendor state", async () => {
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       expect(result.current.vendorState.isOnboarded).toBe(false);
       expect(result.current.vendorState.vendorId).toBeNull();
@@ -837,7 +851,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
 
     it("should update vendor state with updateVendorState()", async () => {
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       act(() => {
         result.current.updateVendorState({
@@ -857,7 +871,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       act(() => {
         result.current.updateVendorState({
@@ -888,7 +902,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
   describe("Active Form Management", () => {
     it("should set active form with setActiveForm()", async () => {
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       act(() => {
         result.current.setActiveForm("pods_lite");
@@ -899,7 +913,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
 
     it("should clear active form with setActiveForm(null)", async () => {
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       act(() => {
         result.current.setActiveForm("sso_config");
@@ -919,7 +933,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       act(() => {
         result.current.setActiveForm("api_tester");
@@ -938,7 +952,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
 
     it("should clear active form with clearChat()", async () => {
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       act(() => {
         result.current.setActiveForm("credentials");
@@ -959,7 +973,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
   describe("Edge Cases", () => {
     it("should reject empty message", async () => {
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("");
@@ -972,7 +986,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
 
     it("should reject whitespace-only message", async () => {
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("   ");
@@ -987,7 +1001,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       mockFetch.mockResolvedValueOnce(createMockStreamResponse(events));
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("  Hello  ");
@@ -1008,7 +1022,7 @@ describe("MVP-04: useChat Hook Streaming", () => {
       );
 
       const { useChat } = await import("@/lib/hooks/useChat");
-      const { result } = renderHook(() => useChat());
+      const { result } = renderHook(() => useChat(), { wrapper });
 
       await act(async () => {
         await result.current.sendMessage("Hi");

@@ -19,6 +19,8 @@ import {
   createVendor,
   getAuditLogs,
   logAuditEvent,
+  listPodsApplications,
+  updateSandboxEndpoints,
 } from "@/lib/db";
 import { resourcesToEndpoints } from "@/lib/config/oneroster";
 import { FORM_TYPES } from "@/lib/config/forms";
@@ -34,6 +36,7 @@ import type {
   GetCredentialsInput,
   CheckStatusInput,
   RequestUpgradeInput,
+  UpdateEndpointsInput,
 } from "./tools";
 
 // =============================================================================
@@ -55,47 +58,97 @@ export interface ToolResult {
 
 /**
  * 1. lookup_pods - Query existing PoDS applications
+ *
+ * Uses Prisma database directly - no more HTTP workarounds needed.
+ * Data persists to SQLite (dev) / PostgreSQL (prod) so all API routes share the same data.
  */
 export async function handleLookupPods(
   input: LookupPodsInput
 ): Promise<ToolResult> {
   const { query } = input;
-  const podsDatabase = getMockPodsDatabase();
+  console.log(`[handleLookupPods] Searching for: "${query}"`);
 
-  // Search by ID, vendor name, or email (case-insensitive)
-  const searchLower = query.toLowerCase();
-  const found = podsDatabase.find(
-    (app) =>
-      app.id.toLowerCase() === searchLower ||
-      app.vendorName.toLowerCase().includes(searchLower) ||
-      app.contactEmail.toLowerCase() === searchLower
-  );
+  try {
+    // Get static demo records (hardcoded)
+    const staticRecords = getMockPodsDatabase();
+    console.log(`[handleLookupPods] Static records: ${staticRecords.length}`);
 
-  if (!found) {
+    // Get user submissions from Prisma database
+    const dbApplications = await listPodsApplications();
+    console.log(`[handleLookupPods] DB applications: ${dbApplications.length}`);
+
+    // Combine: database applications first (most recent), then static records
+    // Dedupe by ID to avoid duplicates
+    const seenIds = new Set<string>();
+    const podsDatabase: Array<{
+      id: string;
+      vendorName: string;
+      applicationName: string;
+      contactEmail: string;
+      status: string;
+      accessTier: string;
+      submittedAt: Date | null;
+      reviewedAt: Date | null;
+      expiresAt: Date | null;
+    }> = [];
+
+    for (const app of dbApplications) {
+      if (!seenIds.has(app.id)) {
+        seenIds.add(app.id);
+        podsDatabase.push(app);
+      }
+    }
+
+    for (const app of staticRecords) {
+      if (!seenIds.has(app.id)) {
+        seenIds.add(app.id);
+        podsDatabase.push(app);
+      }
+    }
+
+    // Search by ID, vendor name, or email (case-insensitive)
+    const searchLower = query.toLowerCase();
+    const found = podsDatabase.find(
+      (app) =>
+        app.id.toLowerCase() === searchLower ||
+        app.vendorName.toLowerCase().includes(searchLower) ||
+        app.contactEmail.toLowerCase() === searchLower
+    );
+
+    if (!found) {
+      console.log(`[handleLookupPods] No match found. Database has ${podsDatabase.length} records.`);
+      return {
+        success: true,
+        data: null,
+        message: `No PoDS application found for "${query}". This vendor may need to complete the PoDS-Lite application to get started.`,
+      };
+    }
+
+    console.log(`[handleLookupPods] Found: ${found.vendorName} (${found.id})`);
     return {
       success: true,
-      data: null,
-      message: `No PoDS application found for "${query}". This vendor may need to complete the PoDS-Lite application to get started.`,
+      data: {
+        applicationId: found.id,
+        vendorName: found.vendorName,
+        applicationName: found.applicationName,
+        contactEmail: found.contactEmail,
+        status: found.status,
+        accessTier: found.accessTier,
+        submittedAt: found.submittedAt?.toISOString() ?? null,
+        reviewedAt: found.reviewedAt?.toISOString() ?? null,
+        expiresAt: found.expiresAt?.toISOString() ?? null,
+        statusDescription: getPodsStatusDescription(found.status),
+        tierDescription: getAccessTierDescription(found.accessTier),
+      },
+      message: `Found PoDS application for ${found.vendorName}`,
+    };
+  } catch (error) {
+    console.error(`[handleLookupPods] ERROR:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to lookup PoDS application",
     };
   }
-
-  return {
-    success: true,
-    data: {
-      applicationId: found.id,
-      vendorName: found.vendorName,
-      applicationName: found.applicationName,
-      contactEmail: found.contactEmail,
-      status: found.status,
-      accessTier: found.accessTier,
-      submittedAt: found.submittedAt?.toISOString() ?? null,
-      reviewedAt: found.reviewedAt?.toISOString() ?? null,
-      expiresAt: found.expiresAt?.toISOString() ?? null,
-      statusDescription: getPodsStatusDescription(found.status),
-      tierDescription: getAccessTierDescription(found.accessTier),
-    },
-    message: `Found PoDS application for ${found.vendorName}`,
-  };
 }
 
 /**
@@ -162,12 +215,12 @@ export async function handleSubmitPodsLite(input: {
       accessTier: "PRIVACY_SAFE",
     });
 
-    // Also add to mock PoDS database for lookup_pods to find
+    // Also add to PoDS database for lookup_pods to find
     const podsId = `PODS-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`;
     const now = new Date();
     const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-    addPodsApplication({
+    await addPodsApplication({
       id: podsId,
       vendorName: input.vendorName,
       applicationName: input.vendorName,
@@ -723,9 +776,14 @@ export async function handleCheckStatus(
 ): Promise<ToolResult> {
   const { vendor_id, include_details = true } = input;
 
+  console.log(`[handleCheckStatus] Checking status for vendor_id: "${vendor_id}"`);
+
   try {
     const vendor = await getVendor(vendor_id);
     const sandbox = await getSandbox(vendor_id);
+
+    console.log(`[handleCheckStatus] getVendor result:`, vendor ? `Found: ${vendor.name}` : "NOT FOUND");
+    console.log(`[handleCheckStatus] getSandbox result:`, sandbox ? `Found: ${sandbox.apiKey?.slice(0, 10)}...` : "NOT FOUND");
 
     // If no vendor, check mock PoDS database
     let podsInfo = null;
@@ -902,6 +960,78 @@ export async function handleRequestUpgrade(
   };
 }
 
+/**
+ * 13. update_endpoints - Modify allowed OneRoster endpoints
+ */
+export async function handleUpdateEndpoints(
+  input: UpdateEndpointsInput
+): Promise<ToolResult> {
+  const { vendor_id, endpoints, mode = "add" } = input;
+
+  try {
+    // Check if vendor exists
+    const vendor = await getVendor(vendor_id);
+    if (!vendor) {
+      return {
+        success: false,
+        error: `Vendor not found with ID: ${vendor_id}. Please ensure the vendor has completed PoDS-Lite first.`,
+      };
+    }
+
+    // Check if vendor has sandbox credentials
+    const existingSandbox = await getSandbox(vendor_id);
+    if (!existingSandbox) {
+      return {
+        success: false,
+        error:
+          "No sandbox credentials found. Please provision sandbox credentials first before updating endpoints.",
+      };
+    }
+
+    // Update endpoints
+    const updatedSandbox = await updateSandboxEndpoints(
+      vendor_id,
+      endpoints,
+      mode
+    );
+
+    if (!updatedSandbox) {
+      return {
+        success: false,
+        error: "Failed to update endpoints. Please try again.",
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        vendorId: vendor_id,
+        vendorName: vendor.name,
+        mode,
+        previousEndpoints: existingSandbox.allowedEndpoints,
+        updatedEndpoints: updatedSandbox.allowedEndpoints,
+        addedEndpoints:
+          mode === "add"
+            ? updatedSandbox.allowedEndpoints.filter(
+                (ep) => !existingSandbox.allowedEndpoints.includes(ep)
+              )
+            : null,
+      },
+      message:
+        mode === "add"
+          ? `Successfully added ${endpoints.length} endpoint(s) to your sandbox. You now have access to ${updatedSandbox.allowedEndpoints.length} endpoints.`
+          : `Successfully updated your sandbox endpoints. You now have access to ${updatedSandbox.allowedEndpoints.length} endpoints.`,
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    return {
+      success: false,
+      error: `Failed to update endpoints: ${errorMessage}`,
+    };
+  }
+}
+
 // =============================================================================
 // TOOL ROUTER
 // =============================================================================
@@ -981,6 +1111,11 @@ export async function executeToolCall(
       case "request_upgrade":
         return await handleRequestUpgrade(
           params as unknown as RequestUpgradeInput
+        );
+
+      case "update_endpoints":
+        return await handleUpdateEndpoints(
+          params as unknown as UpdateEndpointsInput
         );
 
       default:

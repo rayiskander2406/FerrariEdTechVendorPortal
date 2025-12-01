@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { Send, CheckCircle2, Loader2, AlertCircle, X, Settings, RotateCcw } from "lucide-react";
+import { Send, CheckCircle2, Loader2, AlertCircle, X, Settings, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/lib/hooks/useChat";
@@ -21,8 +21,11 @@ import { AppSubmitForm, type AppSubmission } from "@/components/forms/AppSubmitF
 import { CredentialsDisplay } from "@/components/dashboard/CredentialsDisplay";
 import { AuditLogViewer } from "@/components/dashboard/AuditLogViewer";
 
-// DB functions (only for audit logs which don't need server persistence)
-import { logAuditEvent, getAuditLogs } from "@/lib/db";
+// Error boundaries (HARD-06)
+import { ChatErrorBoundary, FormErrorBoundary } from "@/components/ui/ErrorBoundary";
+
+// NOTE: All db functions must be accessed via API routes, not direct imports
+// Prisma cannot run in browser environment
 
 // Config - for converting data elements to endpoints
 import { dataElementsToEndpoints } from "@/lib/config/oneroster";
@@ -55,7 +58,7 @@ async function createVendorViaApi(podsLiteInput: PodsLiteInput, accessTier: stri
   }
 
   const data = await response.json();
-  console.log("[createVendorViaApi] Created vendor:", data.vendor.id);
+  // Note: Vendor ID intentionally not logged to avoid PII leakage
   return data.vendor;
 }
 
@@ -87,7 +90,7 @@ async function createSandboxViaApi(vendorId: string, requestedEndpoints?: string
   }
 
   const data = await response.json();
-  console.log("[createSandboxViaApi] Created sandbox:", data.sandbox.id, "with endpoints:", data.sandbox.allowedEndpoints);
+  // Note: Sandbox ID and endpoints intentionally not logged to avoid PII leakage
   return data.sandbox;
 }
 
@@ -121,6 +124,70 @@ async function persistPodsApplication(data: {
     }
   } catch (err) {
     console.error("[persistPodsApplication] Error:", err);
+  }
+}
+
+/**
+ * Log audit event via API (server-side storage)
+ * CRITICAL: Must use API - Prisma cannot run in browser
+ */
+async function logAuditEvent(event: {
+  vendorId: string;
+  action: string;
+  resourceType: string;
+  resourceId?: string;
+  details?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const response = await fetch("/api/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    });
+    if (!response.ok) {
+      console.error("[logAuditEvent] Failed to log:", await response.text());
+    }
+  } catch (err) {
+    // Silent fail - don't block user operations for audit logging
+    console.error("[logAuditEvent] Error:", err);
+  }
+}
+
+/**
+ * Get audit logs via API (server-side retrieval)
+ * CRITICAL: Must use API - Prisma cannot run in browser
+ */
+async function getAuditLogs(
+  vendorId: string,
+  limit: number = 100
+): Promise<AuditLog[]> {
+  try {
+    const response = await fetch(
+      `/api/audit?vendorId=${encodeURIComponent(vendorId)}&limit=${limit}`
+    );
+    if (!response.ok) {
+      console.error("[getAuditLogs] Failed to fetch:", await response.text());
+      return [];
+    }
+    const data = await response.json();
+    // Convert timestamp strings to Date objects
+    return (data.logs ?? []).map((log: {
+      id: string;
+      vendorId: string;
+      action: string;
+      resourceType: string;
+      resourceId?: string;
+      details?: Record<string, unknown>;
+      timestamp: string;
+      ipAddress?: string;
+      userAgent?: string;
+    }) => ({
+      ...log,
+      timestamp: new Date(log.timestamp),
+    }));
+  } catch (err) {
+    console.error("[getAuditLogs] Error:", err);
+    return [];
   }
 }
 
@@ -203,88 +270,97 @@ export default function ChatPage() {
   }, [error, toast]);
 
   // ==========================================================================
-  // RESTORE PoDS DATA FROM LOCALSTORAGE (survives server restarts)
+  // SYNC PoDS DATA: Database-First Hydration Pattern
+  // 1. Sync FROM database to localStorage (ensures fresh data)
+  // 2. Restore TO server any localStorage-only data (survives server restarts)
   // ==========================================================================
 
   useEffect(() => {
-    const restorePodsFromLocalStorage = async () => {
+    const syncPodsData = async () => {
+      const PODS_BACKUP_KEY = "schoolday_pods_backup";
+
       try {
-        const backup = localStorage.getItem("schoolday_pods_backup");
-        if (!backup) return;
+        // Step 1: Get current localStorage backup
+        const backup = localStorage.getItem(PODS_BACKUP_KEY);
+        const backupList: Array<{
+          id: string;
+          vendorName: string;
+          applicationName: string;
+          contactEmail: string;
+          status: string;
+          accessTier: string;
+          submittedAt: string;
+          reviewedAt: string;
+          expiresAt: string;
+        }> = backup ? JSON.parse(backup) : [];
 
-        const backupList = JSON.parse(backup);
-        if (!Array.isArray(backupList) || backupList.length === 0) return;
+        // Step 2: For each vendor in localStorage, sync FROM database
+        const syncedList = [...backupList];
+        let hasChanges = false;
 
-        console.log(`[Chat] Restoring ${backupList.length} PoDS application(s) from localStorage`);
-
-        // Re-persist each PoDS application to the server
-        // Also restore vendorState for the most recent approved vendor
-        let mostRecentApproved: typeof backupList[0] | null = null;
-
-        for (const podsData of backupList) {
+        for (const cached of syncedList) {
           try {
-            await persistPodsApplication({
-              ...podsData,
-              submittedAt: new Date(podsData.submittedAt),
-              reviewedAt: new Date(podsData.reviewedAt),
-              expiresAt: new Date(podsData.expiresAt),
-            });
-            console.log(`[Chat] Restored PoDS for: ${podsData.vendorName}`);
+            // Fetch fresh data from database
+            const response = await fetch(
+              `/api/pods?vendorName=${encodeURIComponent(cached.vendorName)}`
+            );
 
-            // Track the most recent approved vendor for vendorState
-            if (podsData.status === "APPROVED") {
-              mostRecentApproved = podsData;
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.application) {
+                const fresh = data.application;
+                // Update localStorage with fresh database values
+                if (
+                  fresh.status !== cached.status ||
+                  fresh.accessTier !== cached.accessTier
+                ) {
+                  cached.status = fresh.status;
+                  cached.accessTier = fresh.accessTier;
+                  cached.submittedAt = fresh.submittedAt;
+                  cached.reviewedAt = fresh.reviewedAt;
+                  cached.expiresAt = fresh.expiresAt;
+                  hasChanges = true;
+                }
+              }
+            } else if (response.status === 404) {
+              // Data exists in localStorage but not in DB - restore to server
+              await persistPodsApplication({
+                id: cached.id,
+                vendorName: cached.vendorName,
+                applicationName: cached.applicationName,
+                contactEmail: cached.contactEmail,
+                status: cached.status,
+                accessTier: cached.accessTier,
+                submittedAt: new Date(cached.submittedAt),
+                reviewedAt: new Date(cached.reviewedAt),
+                expiresAt: new Date(cached.expiresAt),
+              });
             }
-          } catch (err) {
-            console.warn(`[Chat] Failed to restore PoDS for ${podsData.vendorName}:`, err);
+          } catch {
+            // Silent fail on individual sync - continue with others
           }
         }
 
-        // Also restore vendorState from localStorage if available
-        const savedVendorState = localStorage.getItem("schoolday_vendor_state");
-        if (savedVendorState) {
-          try {
-            const parsed = JSON.parse(savedVendorState);
-            console.log("[Chat] Restoring vendorState from localStorage:", parsed);
-            updateVendorState({
-              isOnboarded: parsed.isOnboarded ?? false,
-              vendorId: parsed.vendorId ?? null,
-              companyName: parsed.companyName ?? null,
-              accessTier: parsed.accessTier ?? null,
-              podsStatus: parsed.podsStatus ?? null,
-              credentials: parsed.credentials ?? null,
-              integrations: parsed.integrations ?? [],
-            });
-          } catch (parseErr) {
-            console.warn("[Chat] Failed to parse saved vendorState:", parseErr);
-          }
-        } else if (mostRecentApproved) {
-          // Fallback: create vendorState from restored PoDS data
-          console.log("[Chat] Creating vendorState from restored PoDS:", mostRecentApproved.vendorName);
-          updateVendorState({
-            isOnboarded: true,
-            vendorId: mostRecentApproved.id || `restored_${Date.now()}`,
-            companyName: mostRecentApproved.vendorName,
-            accessTier: (mostRecentApproved.accessTier as "PRIVACY_SAFE" | "SELECTIVE" | "FULL_ACCESS") ?? "PRIVACY_SAFE",
-            podsStatus: mostRecentApproved.status,
-          });
+        // Step 3: Save updated list if there were changes
+        if (hasChanges) {
+          localStorage.setItem(PODS_BACKUP_KEY, JSON.stringify(syncedList));
         }
-      } catch (err) {
-        console.warn("[Chat] Failed to restore from localStorage:", err);
+      } catch {
+        // Silent fail on sync
       }
     };
 
-    restorePodsFromLocalStorage();
-  }, [updateVendorState]); // Run once on mount
+    syncPodsData();
+  }, []); // Run once on mount - no dependencies needed
 
   // ==========================================================================
   // HELPER: Add system message to chat
   // ==========================================================================
 
-  const addSystemMessage = useCallback((content: string) => {
+  const addSystemMessage = useCallback((_content: string) => {
     // This is a workaround since we can't directly add messages
     // In production, this would be handled by the useChat hook
-    console.log("[System Message]", content);
+    // Note: System messages intentionally not logged to avoid console noise
   }, []);
 
   // ==========================================================================
@@ -314,15 +390,8 @@ export default function ChatPage() {
         // Use dataElementsToEndpoints() to map PII field types → API endpoints
         const requestedEndpoints = dataElementsToEndpoints(data.dataElementsRequested);
 
-        // DEBUG: Log endpoint mapping
-        console.log("[handlePodsLiteSubmit] dataElementsRequested:", data.dataElementsRequested);
-        console.log("[handlePodsLiteSubmit] requestedEndpoints (after mapping):", requestedEndpoints);
-
         // Create sandbox credentials via API (server-side storage)
         const creds = await createSandboxViaApi(vendor.id, requestedEndpoints);
-
-        // DEBUG: Log credentials with endpoints
-        console.log("[handlePodsLiteSubmit] creds.allowedEndpoints:", creds.allowedEndpoints);
 
         // Persist to server-side PoDS database so lookup_pods can find it
         const podsId = `PODS-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`;
@@ -367,9 +436,8 @@ export default function ChatPage() {
             });
           }
           localStorage.setItem("schoolday_pods_backup", JSON.stringify(backupList));
-          console.log("[handlePodsLiteSubmit] Saved PoDS backup to localStorage");
-        } catch (lsErr) {
-          console.warn("[handlePodsLiteSubmit] Failed to backup to localStorage:", lsErr);
+        } catch {
+          // Silent fail on localStorage backup - data is persisted on server
         }
 
         // Convert API response to SandboxCredentials format for vendorState
@@ -401,9 +469,8 @@ export default function ChatPage() {
         // Also save vendorState to localStorage for persistence across page reloads
         try {
           localStorage.setItem("schoolday_vendor_state", JSON.stringify(newVendorState));
-          console.log("[handlePodsLiteSubmit] Saved vendorState to localStorage");
-        } catch (lsErr) {
-          console.warn("[handlePodsLiteSubmit] Failed to save vendorState to localStorage:", lsErr);
+        } catch {
+          // Silent fail - state already updated via VendorContext
         }
 
         // NOTE: Removed setActiveForm("credentials") - PodsLiteForm now handles
@@ -668,12 +735,43 @@ export default function ChatPage() {
   }, [setActiveForm]);
 
   /**
-   * Handle reset - clears localStorage and reloads the page
+   * Handle clear session - clears localStorage and chat, but keeps database
+   * Use this to start a new conversation without losing vendor data
    */
-  const handleReset = useCallback(() => {
+  const handleClearSession = useCallback(() => {
     // Clear all SchoolDay-related localStorage
     localStorage.removeItem("schoolday_pods_backup");
     localStorage.removeItem("schoolday_vendor_state");
+    localStorage.removeItem("schoolday-feature-flags");
+
+    // Clear chat state
+    clearChat();
+
+    // Reload the page to reset React state
+    window.location.reload();
+  }, [clearChat]);
+
+  /**
+   * Handle clear database - clears everything including database
+   * Use this to start completely fresh (removes all vendors, PoDS, etc.)
+   */
+  const handleClearDatabase = useCallback(async () => {
+    // Clear database first (PoDS applications, vendors, sandboxes)
+    try {
+      const response = await fetch("/api/reset", { method: "POST" });
+      if (!response.ok) {
+        console.error("[Reset] API call failed:", await response.text());
+      } else {
+        console.log("[Reset] Database cleared successfully");
+      }
+    } catch (error) {
+      console.error("[Reset] Failed to clear database:", error);
+    }
+
+    // Clear all SchoolDay-related localStorage
+    localStorage.removeItem("schoolday_pods_backup");
+    localStorage.removeItem("schoolday_vendor_state");
+    localStorage.removeItem("schoolday-feature-flags");
 
     // Clear chat state
     clearChat();
@@ -690,9 +788,7 @@ export default function ChatPage() {
     switch (activeForm) {
       case "pods_lite":
         // Get prefill from formData (AI tool result) or vendorState
-        console.log("[page.tsx renderForm] formData:", formData);
         const podsPrefill = formData?.prefill as { vendorName?: string; contactEmail?: string } | undefined;
-        console.log("[page.tsx renderForm] podsPrefill:", podsPrefill);
         return (
           <PodsLiteForm
             onSubmit={handlePodsLiteSubmit}
@@ -831,14 +927,24 @@ export default function ChatPage() {
                 <span className="text-[10px] sm:text-xs font-medium text-success-700">AI Online</span>
               </div>
 
-              {/* Reset Button */}
+              {/* Clear Session Button */}
               <button
-                onClick={handleReset}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
-                title="Reset session and clear all data"
+                onClick={handleClearSession}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                title="Clear chat and session (keeps database)"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset
+                <RotateCcw className="w-3 h-3" />
+                Session
+              </button>
+
+              {/* Clear Database Button */}
+              <button
+                onClick={handleClearDatabase}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors"
+                title="Clear everything including database"
+              >
+                <Trash2 className="w-3 h-3" />
+                Database
               </button>
 
               {/* Feature Flags Dashboard Link */}
@@ -918,7 +1024,8 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Messages */}
+          {/* Messages - wrapped with error boundary (HARD-06) */}
+          <ChatErrorBoundary>
           <div className="space-y-4">
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
@@ -953,9 +1060,11 @@ export default function ChatPage() {
                     </div>
                   )}
 
-                  {/* Form Content - full width on mobile */}
+                  {/* Form Content - wrapped with error boundary (HARD-06) */}
                   <div className="p-3 sm:p-4">
-                    {renderForm()}
+                    <FormErrorBoundary formName={getFormTitle(activeForm)}>
+                      {renderForm()}
+                    </FormErrorBoundary>
                   </div>
                 </div>
               </div>
@@ -964,6 +1073,7 @@ export default function ChatPage() {
             {/* Scroll anchor */}
             <div ref={messagesEndRef} />
           </div>
+          </ChatErrorBoundary>
         </div>
       </main>
 

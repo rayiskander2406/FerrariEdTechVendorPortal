@@ -294,7 +294,7 @@ describe("FIX-005: SSO Flow Vendor Recognition", () => {
         accessTier: "PRIVACY_SAFE" as const,
         podsStatus: "APPROVED",
         credentials: {
-          apiKey: "sk_test_xxx",
+          apiKey: "sbox_test_xxx",
           baseUrl: "https://sandbox.lausd.com"
         }
       };
@@ -530,7 +530,7 @@ describe("E2E: Complete Onboarding Flow After Fixes", () => {
     const { clearAllStores } = await import("@/lib/db");
     const { clearSessionPodsSubmissions } = await import("@/lib/data/synthetic");
 
-    clearAllStores();
+    await clearAllStores();
     clearSessionPodsSubmissions();
 
     // Step 1: Submit PoDS with vendor name extraction

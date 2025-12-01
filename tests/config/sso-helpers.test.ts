@@ -323,18 +323,16 @@ describe("SSO UI Configuration", () => {
 // =============================================================================
 
 describe("AI_TOOL_SSO_PROVIDERS", () => {
-  it("should have exactly 3 providers", () => {
-    expect(AI_TOOL_SSO_PROVIDERS).toHaveLength(3);
+  it("should have exactly 4 providers", () => {
+    // SCHOOLDAY, CLEVER, CLASSLINK, GOOGLE - as per lib/config/sso.ts
+    expect(AI_TOOL_SSO_PROVIDERS).toHaveLength(4);
   });
 
-  it("should include CLEVER, CLASSLINK, GOOGLE", () => {
+  it("should include all 4 SSO providers", () => {
+    expect(AI_TOOL_SSO_PROVIDERS).toContain("SCHOOLDAY");
     expect(AI_TOOL_SSO_PROVIDERS).toContain("CLEVER");
     expect(AI_TOOL_SSO_PROVIDERS).toContain("CLASSLINK");
     expect(AI_TOOL_SSO_PROVIDERS).toContain("GOOGLE");
-  });
-
-  it("should NOT include SCHOOLDAY", () => {
-    expect(AI_TOOL_SSO_PROVIDERS).not.toContain("SCHOOLDAY");
   });
 });
 
