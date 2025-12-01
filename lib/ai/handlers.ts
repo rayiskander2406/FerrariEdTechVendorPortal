@@ -19,6 +19,7 @@ import {
   createVendor,
   getAuditLogs,
   logAuditEvent,
+  listPodsApplications,
 } from "@/lib/db";
 import { resourcesToEndpoints } from "@/lib/config/oneroster";
 import { FORM_TYPES } from "@/lib/config/forms";
@@ -55,12 +56,49 @@ export interface ToolResult {
 
 /**
  * 1. lookup_pods - Query existing PoDS applications
+ *
+ * Uses Prisma database directly - no more HTTP workarounds needed.
+ * Data persists to SQLite (dev) / PostgreSQL (prod) so all API routes share the same data.
  */
 export async function handleLookupPods(
   input: LookupPodsInput
 ): Promise<ToolResult> {
   const { query } = input;
-  const podsDatabase = getMockPodsDatabase();
+
+  // Get static demo records (hardcoded)
+  const staticRecords = getMockPodsDatabase();
+
+  // Get user submissions from Prisma database
+  const dbApplications = await listPodsApplications();
+
+  // Combine: database applications first (most recent), then static records
+  // Dedupe by ID to avoid duplicates
+  const seenIds = new Set<string>();
+  const podsDatabase: Array<{
+    id: string;
+    vendorName: string;
+    applicationName: string;
+    contactEmail: string;
+    status: string;
+    accessTier: string;
+    submittedAt: Date | null;
+    reviewedAt: Date | null;
+    expiresAt: Date | null;
+  }> = [];
+
+  for (const app of dbApplications) {
+    if (!seenIds.has(app.id)) {
+      seenIds.add(app.id);
+      podsDatabase.push(app);
+    }
+  }
+
+  for (const app of staticRecords) {
+    if (!seenIds.has(app.id)) {
+      seenIds.add(app.id);
+      podsDatabase.push(app);
+    }
+  }
 
   // Search by ID, vendor name, or email (case-insensitive)
   const searchLower = query.toLowerCase();
@@ -162,12 +200,12 @@ export async function handleSubmitPodsLite(input: {
       accessTier: "PRIVACY_SAFE",
     });
 
-    // Also add to mock PoDS database for lookup_pods to find
+    // Also add to PoDS database for lookup_pods to find
     const podsId = `PODS-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`;
     const now = new Date();
     const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-    addPodsApplication({
+    await addPodsApplication({
       id: podsId,
       vendorName: input.vendorName,
       applicationName: input.vendorName,

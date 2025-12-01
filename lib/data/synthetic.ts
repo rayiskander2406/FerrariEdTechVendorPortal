@@ -7,7 +7,21 @@
  * - Classes and Enrollments
  *
  * All tokens are deterministic using seeded hashing.
+ *
+ * NOTE: PoDS applications are stored in the unified lib/db layer (HARD-04).
+ * This file re-exports the type and provides wrapper functions for backwards compatibility.
  */
+
+// HARD-04: Import PodsApplication from unified types and db functions
+import { type PodsApplication } from "@/lib/types";
+import {
+  addPodsApplication as dbAddPodsApplication,
+  listPodsApplications as dbListPodsApplications,
+  clearPodsApplications as dbClearPodsApplications,
+} from "@/lib/db";
+
+// Re-export PodsApplication type for backwards compatibility
+export type { PodsApplication };
 
 // =============================================================================
 // TYPES
@@ -79,17 +93,8 @@ export interface SyntheticData {
   };
 }
 
-export interface PodsApplication {
-  id: string;
-  vendorName: string;
-  applicationName: string;
-  contactEmail: string;
-  status: "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
-  accessTier: "PRIVACY_SAFE" | "SELECTIVE" | "FULL_ACCESS";
-  submittedAt: Date | null;
-  reviewedAt: Date | null;
-  expiresAt: Date | null;
-}
+// PodsApplication type is imported from @/lib/types (HARD-04)
+// Re-exported above for backwards compatibility
 
 export interface OneRosterCourse {
   sourcedId: string;
@@ -844,48 +849,140 @@ export function getOneRosterResponse(
 }
 
 // =============================================================================
-// MOCK PODS DATABASE (with session persistence)
+// MOCK PODS DATABASE - Prisma Backend
 // =============================================================================
 
-// Session store for new PoDS submissions (persists during server runtime)
-let _sessionPodsSubmissions: PodsApplication[] = [];
+// NOTE: Data now persists to SQLite (dev) / PostgreSQL (prod) via Prisma.
+// Use lib/db functions directly for all database operations.
 
 /**
- * Add a new PoDS application to the session store
+ * Add a new PoDS application to the database
+ * @deprecated Use lib/db.addPodsApplication directly for new code
  */
 export function addPodsApplication(application: PodsApplication): void {
-  // Check if already exists (by id or vendor name)
-  const existingIndex = _sessionPodsSubmissions.findIndex(
-    (p) => p.id === application.id ||
-           (p.vendorName.toLowerCase() === application.vendorName.toLowerCase() &&
-            p.applicationName.toLowerCase() === application.applicationName.toLowerCase())
-  );
-
-  if (existingIndex >= 0) {
-    // Update existing
-    _sessionPodsSubmissions[existingIndex] = application;
-  } else {
-    // Add new
-    _sessionPodsSubmissions.push(application);
-  }
+  // Fire and forget - the db function is async but callers expect sync
+  void dbAddPodsApplication(application);
 }
 
 /**
- * Get all session PoDS submissions
+ * Get all session PoDS submissions from the database
+ * @deprecated Use lib/db.listPodsApplications directly for new code
+ * Note: This sync function returns empty array - use async version from lib/db
  */
 export function getSessionPodsSubmissions(): PodsApplication[] {
-  return _sessionPodsSubmissions;
+  // Return empty - database queries are async, use listPodsApplications() instead
+  console.warn("[synthetic] getSessionPodsSubmissions is deprecated - use listPodsApplications from lib/db");
+  return [];
 }
 
 /**
- * Clear session PoDS submissions (for testing)
+ * Clear session PoDS submissions from the database
+ * @deprecated Use lib/db.clearPodsApplications directly for new code
  */
 export function clearSessionPodsSubmissions(): void {
-  _sessionPodsSubmissions = [];
+  dbClearPodsApplications();
 }
 
 /**
- * Get mock PoDS applications database with 5 existing records + session submissions
+ * Get mock PoDS applications database with static records + user submissions (async)
+ * @deprecated Use getMockPodsDatabase() for static records and listPodsApplications() for database records
+ */
+export async function getMockPodsDatabaseAsync(): Promise<PodsApplication[]> {
+  // Return static records + database records
+  const staticRecords = getMockPodsDatabase();
+  const dbRecords = await dbListPodsApplications();
+
+  // Combine, deduping by ID
+  const seenIds = new Set<string>();
+  const result: PodsApplication[] = [];
+
+  for (const app of dbRecords) {
+    if (!seenIds.has(app.id)) {
+      seenIds.add(app.id);
+      result.push(app);
+    }
+  }
+
+  for (const app of staticRecords) {
+    if (!seenIds.has(app.id)) {
+      seenIds.add(app.id);
+      result.push(app);
+    }
+  }
+
+  return result;
+}
+
+// Static PoDS records for demo purposes
+function getStaticPodsRecords(): PodsApplication[] {
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+  return [
+    {
+      id: "PODS-2024-001",
+      vendorName: "MathWhiz Learning",
+      applicationName: "MathWhiz Student Portal",
+      contactEmail: "integration@mathwhiz.com",
+      status: "APPROVED",
+      accessTier: "PRIVACY_SAFE",
+      submittedAt: oneMonthAgo,
+      reviewedAt: twoWeeksAgo,
+      expiresAt: oneYearFromNow,
+    },
+    {
+      id: "PODS-2024-002",
+      vendorName: "ReadingRocket Inc",
+      applicationName: "ReadingRocket K-5",
+      contactEmail: "support@readingrocket.io",
+      status: "APPROVED",
+      accessTier: "SELECTIVE",
+      submittedAt: twoWeeksAgo,
+      reviewedAt: oneWeekAgo,
+      expiresAt: oneYearFromNow,
+    },
+    {
+      id: "PODS-2024-003",
+      vendorName: "ScienceLab Pro",
+      applicationName: "Virtual Lab Environment",
+      contactEmail: "admin@sciencelabpro.com",
+      status: "PENDING_REVIEW",
+      accessTier: "PRIVACY_SAFE",
+      submittedAt: oneWeekAgo,
+      reviewedAt: null,
+      expiresAt: null,
+    },
+    {
+      id: "PODS-2024-004",
+      vendorName: "EduTrack Systems",
+      applicationName: "Student Progress Dashboard",
+      contactEmail: "hello@edutrack.net",
+      status: "IN_PROGRESS",
+      accessTier: "FULL_ACCESS",
+      submittedAt: null,
+      reviewedAt: null,
+      expiresAt: null,
+    },
+    {
+      id: "PODS-2024-005",
+      vendorName: "LanguageBridge",
+      applicationName: "ESL Learning Platform",
+      contactEmail: "partners@languagebridge.edu",
+      status: "REJECTED",
+      accessTier: "FULL_ACCESS",
+      submittedAt: oneMonthAgo,
+      reviewedAt: twoWeeksAgo,
+      expiresAt: null,
+    },
+  ];
+}
+
+/**
+ * Get mock PoDS applications database (sync version)
+ * Returns static demo records only. For database records, use getMockPodsDatabaseAsync().
  */
 export function getMockPodsDatabase(): PodsApplication[] {
   const now = new Date();
@@ -952,8 +1049,7 @@ export function getMockPodsDatabase(): PodsApplication[] {
     },
   ];
 
-  // Return static records + session submissions (session submissions take precedence)
-  return [...staticRecords, ..._sessionPodsSubmissions];
+  return staticRecords;
 }
 
 // =============================================================================

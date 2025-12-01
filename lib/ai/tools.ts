@@ -647,19 +647,10 @@ export function validateToolInput(
 // TYPE EXPORTS
 // =============================================================================
 
-export type ToolName =
-  | "lookup_pods"
-  | "submit_pods_lite"
-  | "provision_sandbox"
-  | "configure_sso"
-  | "test_oneroster"
-  | "configure_lti"
-  | "send_test_message"
-  | "submit_app"
-  | "get_audit_logs"
-  | "get_credentials"
-  | "check_status"
-  | "request_upgrade";
+// Re-export ToolId from centralized config as ToolName for backwards compatibility
+// CONFIG-03: AI Tool Names centralization - see lib/config/ai-tools.ts
+import { type ToolId } from "@/lib/config/ai-tools";
+export type ToolName = ToolId;
 
 export interface LookupPodsInput {
   query: string;
