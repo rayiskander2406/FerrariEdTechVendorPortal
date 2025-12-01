@@ -8,14 +8,22 @@
 
 ## Executive Summary
 
-This document defines the data schema for the SchoolDay Vendor Portal's district-side data model. The schema must:
+This document defines the complete data schema for the SchoolDay Vendor Portal. The schema covers:
 
-1. Model LAUSD's organizational hierarchy (District → Schools → Classes → Students)
-2. Enable **school-level access scoping** (vendor sees only selected schools)
-3. Enable **entity-level access scoping** (vendor sees only selected data types)
-4. Integrate with OneRoster 1.2 specification for interoperability
-5. Support privacy tiers (what fields are visible/tokenized)
-6. Be extensible for multi-district deployment
+**District Data (Layers 1-5)**
+1. District hierarchy (District → Schools → Classes → Students)
+2. School-level access scoping (LAUSD feedback)
+3. Entity-level access scoping (which data types vendor can access)
+4. OneRoster 1.2 alignment for interoperability
+5. Privacy tier tokenization rules
+
+**Integration Layer (Layers 6-9)**
+6. SSO integration (sessions, launch context, user mapping)
+7. LTI 1.3 integration (platforms, deployments, resources, grades)
+8. CPaaS integration (templates, preferences, batch messaging)
+9. Parent/Guardian relationships
+
+**Total Models: 28** (up from 6 in current schema)
 
 ---
 
@@ -625,6 +633,670 @@ model TokenMapping {
 | `phone` | Hidden | `TKN_555_XXX_1234` | As-is |
 | `birthDate` | Hidden | Hidden | As-is |
 | `demographics.*` | Hidden | Partial | As-is |
+
+---
+
+## Layer 6: SSO Integration
+
+```prisma
+// =============================================================================
+// SSO SESSION - Active user sessions via SSO
+// =============================================================================
+
+model SsoSession {
+  id              String   @id @default(uuid())
+  vendorId        String
+  userId          String            // Reference to User (student/teacher)
+
+  // Session details
+  sessionToken    String   @unique  // Opaque token for the session
+  accessToken     String?           // OAuth access token (encrypted)
+  refreshToken    String?           // OAuth refresh token (encrypted)
+  idToken         String?           // OIDC ID token
+
+  // Provider info
+  ssoProvider     String            // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+  providerUserId  String?           // User ID from the provider
+
+  // Context (where did user launch from?)
+  launchContextId String?
+
+  // Lifecycle
+  status          String   @default("active")  // active | expired | revoked
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  lastActivityAt  DateTime @default(now())
+
+  // Relations
+  launchContext   SsoLaunchContext? @relation(fields: [launchContextId], references: [id])
+
+  @@index([vendorId])
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// SSO LAUNCH CONTEXT - Where the user launched from
+// =============================================================================
+
+model SsoLaunchContext {
+  id              String   @id @default(uuid())
+  vendorId        String
+
+  // What context?
+  contextType     String            // class | school | district | resource
+  contextId       String?           // ID of the class/school/resource
+
+  // Additional context data
+  returnUrl       String?           // Where to return after session
+  customParams    String?           // JSON: Additional params from launch
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+
+  // Relations
+  sessions        SsoSession[]
+
+  @@index([vendorId])
+  @@index([contextType, contextId])
+}
+
+// =============================================================================
+// SSO USER MAPPING - Maps provider user ID to our User
+// =============================================================================
+
+model SsoUserMapping {
+  id              String   @id @default(uuid())
+  userId          String            // Our User.id
+  ssoProvider     String            // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+  providerUserId  String            // User ID from provider
+
+  // Profile data from provider (cached)
+  providerEmail   String?
+  providerName    String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastLoginAt     DateTime?
+
+  @@unique([ssoProvider, providerUserId])
+  @@unique([userId, ssoProvider])
+  @@index([userId])
+}
+```
+
+---
+
+## Layer 7: LTI 1.3 Integration
+
+```prisma
+// =============================================================================
+// LTI PLATFORM - LAUSD as an LTI Platform (the LMS side)
+// =============================================================================
+
+model LtiPlatform {
+  id                String   @id @default(uuid())
+  districtId        String
+
+  // Platform identity
+  name              String            // "LAUSD Schoology"
+  issuer            String   @unique  // Platform issuer URL
+  platformId        String?           // Platform-assigned ID
+
+  // OIDC/OAuth endpoints
+  authorizationUrl  String            // OIDC auth endpoint
+  tokenUrl          String            // Token endpoint
+  jwksUrl           String            // Platform's JWKS URL
+
+  // Our keys (for this platform)
+  clientId          String            // Our client ID on this platform
+  publicKey         String            // Our public key (PEM)
+  privateKey        String            // Our private key (PEM, encrypted)
+
+  // Status
+  status            String   @default("active")
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  deployments       LtiDeployment[]
+
+  @@index([districtId])
+  @@index([issuer])
+}
+
+// =============================================================================
+// LTI DEPLOYMENT - Tool deployment per vendor on a platform
+// =============================================================================
+
+model LtiDeployment {
+  id                String   @id @default(uuid())
+  platformId        String
+  vendorId          String
+
+  // Deployment identity
+  deploymentId      String            // LTI deployment ID
+
+  // Tool configuration
+  toolName          String            // Display name
+  toolDescription   String?
+  launchUrl         String            // Default launch URL
+  deepLinkUrl       String?           // Deep linking URL
+  iconUrl           String?
+
+  // Capabilities
+  supportsDeepLinking Boolean @default(true)
+  supportsGradeSync    Boolean @default(false)
+  supportsNrps         Boolean @default(true)  // Names & Roles
+
+  // Status
+  status            String   @default("active")
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  platform          LtiPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  resourceLinks     LtiResourceLink[]
+  lineItems         LtiLineItem[]
+
+  @@unique([platformId, deploymentId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+// =============================================================================
+// LTI RESOURCE LINK - Deep-linked content in a class
+// =============================================================================
+
+model LtiResourceLink {
+  id                String   @id @default(uuid())
+  deploymentId      String
+  classId           String            // Which class this is linked to
+
+  // Resource identity
+  resourceLinkId    String            // LTI resource_link_id
+  title             String            // Display title
+  description       String?
+
+  // Custom parameters
+  customParams      String?           // JSON: custom params for launch
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@unique([deploymentId, resourceLinkId])
+  @@index([classId])
+}
+
+// =============================================================================
+// LTI LINE ITEM - Grade passback container (Assignment Grades Services)
+// =============================================================================
+
+model LtiLineItem {
+  id                String   @id @default(uuid())
+  deploymentId      String
+  classId           String            // Which class
+
+  // Line item identity
+  lineItemId        String?           // Platform-assigned ID (after creation)
+  resourceLinkId    String?           // Associated resource link
+
+  // Assignment details
+  label             String            // "Chapter 1 Quiz"
+  scoreMaximum      Float             // Max possible score
+  tag               String?           // Optional tag for grouping
+
+  // Timestamps
+  startDateTime     DateTime?
+  endDateTime       DateTime?
+
+  // Sync status
+  syncStatus        String   @default("pending")  // pending | synced | error
+  lastSyncAt        DateTime?
+  syncError         String?
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  grades            LtiGrade[]
+
+  @@index([deploymentId])
+  @@index([classId])
+  @@index([syncStatus])
+}
+
+// =============================================================================
+// LTI GRADE - Individual student grade for a line item
+// =============================================================================
+
+model LtiGrade {
+  id                String   @id @default(uuid())
+  lineItemId        String
+  userId            String            // Student user ID
+
+  // Score
+  scoreGiven        Float?            // Actual score
+  scoreMaximum      Float             // Max at time of grading
+  activityProgress  String   @default("Completed")  // Initialized | Started | InProgress | Submitted | Completed
+  gradingProgress   String   @default("FullyGraded") // FullyGraded | Pending | PendingManual | Failed | NotReady
+
+  // Comment
+  comment           String?
+
+  // Sync status
+  syncStatus        String   @default("pending")  // pending | synced | error
+  lastSyncAt        DateTime?
+  syncError         String?
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  lineItem          LtiLineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+
+  @@unique([lineItemId, userId])
+  @@index([userId])
+  @@index([syncStatus])
+}
+
+// =============================================================================
+// LTI LAUNCH - Record of each LTI launch (for debugging/audit)
+// =============================================================================
+
+model LtiLaunch {
+  id                String   @id @default(uuid())
+  deploymentId      String
+  userId            String?           // User who launched (if known)
+
+  // Launch details
+  messageType       String            // LtiResourceLinkRequest | LtiDeepLinkingRequest
+  targetLinkUri     String
+  resourceLinkId    String?
+  contextId         String?           // Class/course context
+
+  // Claims (key data from JWT)
+  roles             String?           // JSON array of roles
+  customClaims      String?           // JSON of custom claims
+
+  // Result
+  status            String   @default("success")  // success | error
+  errorMessage      String?
+
+  // Timestamps
+  launchedAt        DateTime @default(now())
+
+  @@index([deploymentId])
+  @@index([userId])
+  @@index([launchedAt])
+}
+```
+
+---
+
+## Layer 8: Communication (CPaaS) Integration
+
+```prisma
+// =============================================================================
+// MESSAGE TEMPLATE - Reusable message templates
+// =============================================================================
+
+model MessageTemplate {
+  id              String   @id @default(uuid())
+  vendorId        String
+  districtId      String?           // District-specific or null for vendor default
+
+  // Template details
+  name            String            // "Welcome Message", "Assignment Reminder"
+  channel         String            // EMAIL | SMS | PUSH | IN_APP
+  category        String            // welcome | reminder | alert | announcement
+
+  // Content
+  subject         String?           // For email
+  bodyTemplate    String            // Template with {{placeholders}}
+
+  // Placeholders available
+  // {{student.firstName}}, {{teacher.firstName}}, {{class.title}}, {{school.name}}
+
+  // Settings
+  isActive        Boolean  @default(true)
+  requiresApproval Boolean @default(false)  // Needs admin approval before send?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([vendorId, name])
+  @@index([vendorId])
+  @@index([districtId])
+  @@index([channel])
+  @@index([category])
+}
+
+// =============================================================================
+// CONTACT PREFERENCE - Parent/Guardian communication preferences
+// =============================================================================
+
+model ContactPreference {
+  id              String   @id @default(uuid())
+  userId          String            // Parent/Guardian user ID
+  studentId       String            // Which student this preference is for
+
+  // Channel preferences
+  emailEnabled    Boolean  @default(true)
+  smsEnabled      Boolean  @default(false)
+  pushEnabled     Boolean  @default(false)
+  inAppEnabled    Boolean  @default(true)
+
+  // Contact info (verified)
+  emailAddress    String?
+  emailVerified   Boolean  @default(false)
+  phoneNumber     String?
+  phoneVerified   Boolean  @default(false)
+
+  // Category preferences (what types of messages?)
+  categoriesEnabled String  @default("[]")  // JSON array: ["reminder", "alert", "announcement"]
+
+  // Quiet hours
+  quietHoursStart String?           // "22:00"
+  quietHoursEnd   String?           // "07:00"
+  timezone        String   @default("America/Los_Angeles")
+
+  // Language
+  preferredLanguage String @default("en")
+
+  // Consent
+  consentGivenAt  DateTime?
+  consentMethod   String?           // online_form | paper | phone
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, studentId])
+  @@index([userId])
+  @@index([studentId])
+}
+
+// =============================================================================
+// MESSAGE BATCH - Scheduled batch message sends
+// =============================================================================
+
+model MessageBatch {
+  id              String   @id @default(uuid())
+  vendorId        String
+  templateId      String?           // Optional: from template
+
+  // Target
+  channel         String            // EMAIL | SMS | PUSH | IN_APP
+  recipientType   String            // STUDENT | PARENT | TEACHER
+
+  // Targeting criteria (JSON)
+  targetCriteria  String            // {"schools": [...], "grades": [...], "classes": [...]}
+
+  // Content
+  subject         String?
+  body            String
+
+  // Schedule
+  scheduledAt     DateTime?         // null = send immediately
+
+  // Status
+  status          String   @default("draft")  // draft | scheduled | sending | sent | cancelled | failed
+
+  // Stats
+  totalRecipients Int      @default(0)
+  sentCount       Int      @default(0)
+  deliveredCount  Int      @default(0)
+  failedCount     Int      @default(0)
+
+  // Processing
+  startedAt       DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  messages        CommunicationMessage[]
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+// =============================================================================
+// COMMUNICATION MESSAGE - Updated to link to batches
+// =============================================================================
+
+// Note: Extends existing CommunicationMessage model
+// Add these fields:
+//   batchId         String?           // If part of a batch
+//   templateId      String?           // If from template
+//   parentUserId    String?           // Parent who receives (for student messages)
+//   metadata        String?           // JSON: additional tracking data
+```
+
+---
+
+## Layer 9: Parent/Guardian Relationships
+
+```prisma
+// =============================================================================
+// PARENT GUARDIAN - Parent/Guardian users and their relationships
+// =============================================================================
+
+model ParentGuardian {
+  id              String   @id @default(uuid())
+  sourcedId       String   @unique  // OneRoster ID
+
+  // Identity
+  givenName       String
+  familyName      String
+  token           String   @unique  // TKN_PAR_XXXXX
+
+  // Contact (real, tokenized on output)
+  email           String?
+  phone           String?
+
+  // Status
+  status          String   @default("active")
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  studentRelationships ParentStudentRelationship[]
+  contactPreferences   ContactPreference[]
+
+  @@index([token])
+  @@index([status])
+}
+
+// =============================================================================
+// PARENT STUDENT RELATIONSHIP - Links parents to students
+// =============================================================================
+
+model ParentStudentRelationship {
+  id              String   @id @default(uuid())
+  parentId        String
+  studentId       String            // User.id where role = 'student'
+
+  // Relationship type
+  relationshipType String           // mother | father | guardian | grandparent | other
+  isPrimary       Boolean  @default(false)  // Primary contact?
+
+  // Permissions
+  canViewGrades   Boolean  @default(true)
+  canViewAttendance Boolean @default(true)
+  canReceiveAlerts Boolean @default(true)
+  canPickup       Boolean  @default(false)  // Emergency pickup authorized
+
+  // Custody/Legal
+  hasCustody      Boolean  @default(true)
+  legalRestrictions String?          // Any legal notes
+
+  // Verification
+  verifiedAt      DateTime?
+  verifiedBy      String?           // Admin who verified
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  parent          ParentGuardian @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@index([studentId])
+  @@index([isPrimary])
+}
+```
+
+---
+
+## Complete Entity Relationship Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           COMPLETE DATA MODEL                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  VENDOR PORTAL                    DISTRICT DATA                              │
+│  ─────────────                    ─────────────                              │
+│  ┌──────────┐                     ┌──────────┐                               │
+│  │  Vendor  │────────────────────▶│ District │                               │
+│  └────┬─────┘    VendorDataGrant  └────┬─────┘                               │
+│       │                                │                                     │
+│       │                                ▼                                     │
+│       │                          ┌──────────┐                                │
+│       │    VendorSchoolGrant     │  School  │◀─┐                             │
+│       │         │                └────┬─────┘  │                             │
+│       │         │                     │        │                             │
+│       │         ▼                     ▼        │                             │
+│       │    ┌─────────┐          ┌─────────┐   │                             │
+│       │    │ Schools │          │  Users  │───┤ (multi-school)              │
+│       │    │ Allowed │          └────┬────┘   │                             │
+│       │    └─────────┘               │        │                             │
+│       │                              ▼        │                             │
+│       │                         ┌─────────┐   │                             │
+│       │                         │  Class  │───┘                             │
+│       │                         └────┬────┘                                  │
+│       │                              │                                       │
+│       │                              ▼                                       │
+│       │                        ┌───────────┐                                │
+│       │                        │Enrollment │                                │
+│       │                        └───────────┘                                │
+│       │                                                                      │
+│  INTEGRATIONS                                                                │
+│  ────────────                                                                │
+│       │                                                                      │
+│       ├──▶ SSO                                                               │
+│       │    ├── SsoSession                                                    │
+│       │    ├── SsoLaunchContext                                              │
+│       │    └── SsoUserMapping                                                │
+│       │                                                                      │
+│       ├──▶ LTI 1.3                                                           │
+│       │    ├── LtiPlatform (LAUSD Schoology)                                 │
+│       │    ├── LtiDeployment                                                 │
+│       │    ├── LtiResourceLink                                               │
+│       │    ├── LtiLineItem                                                   │
+│       │    ├── LtiGrade                                                      │
+│       │    └── LtiLaunch                                                     │
+│       │                                                                      │
+│       ├──▶ OneRoster (via VendorDataGrant)                                   │
+│       │    └── Scoped by schools + entity types                              │
+│       │                                                                      │
+│       └──▶ CPaaS                                                             │
+│            ├── MessageTemplate                                               │
+│            ├── ContactPreference                                             │
+│            ├── MessageBatch                                                  │
+│            └── CommunicationMessage                                          │
+│                                                                              │
+│  RELATIONSHIPS                                                               │
+│  ─────────────                                                               │
+│       ┌────────────────┐         ┌─────────┐                                │
+│       │ ParentGuardian │────────▶│ Student │                                │
+│       └────────────────┘         └─────────┘                                │
+│              via ParentStudentRelationship                                   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Integration Flow Examples
+
+### SSO Login Flow
+
+```
+1. User clicks "Login with Clever" in vendor app
+2. Redirect to Clever OAuth
+3. Clever redirects back with auth code
+4. Exchange code for tokens
+5. Look up SsoUserMapping by (provider, providerUserId)
+6. Create SsoSession with context
+7. Return session token to vendor
+8. Vendor uses session for API calls
+```
+
+### LTI Launch Flow
+
+```
+1. Teacher clicks tool link in Schoology
+2. Schoology POSTs LTI launch JWT
+3. Validate JWT signature via LtiPlatform.jwksUrl
+4. Look up LtiDeployment by (platform, deploymentId)
+5. Create LtiLaunch record
+6. Extract user from claims, map to our User
+7. Extract class context from claims
+8. Redirect to vendor's launch URL with session
+```
+
+### Grade Passback Flow
+
+```
+1. Student completes assignment in vendor app
+2. Vendor calls POST /api/lti/grades
+3. Look up LtiLineItem for this assignment
+4. Create/update LtiGrade record
+5. Background job syncs to platform:
+   - POST to platform's lineitem endpoint
+   - Update syncStatus and lastSyncAt
+6. Return success to vendor
+```
+
+### Batch Message Flow
+
+```
+1. Vendor creates MessageBatch via API
+2. Set targetCriteria: {"schools": ["ALHS"], "grades": ["9"]}
+3. Schedule for 3pm
+4. At 3pm, background job:
+   - Query users matching criteria
+   - Look up ContactPreference for each parent
+   - Filter by channel preferences and quiet hours
+   - Create CommunicationMessage for each
+   - Send via provider (Twilio/SendGrid)
+   - Update delivery status
+```
 
 ---
 
