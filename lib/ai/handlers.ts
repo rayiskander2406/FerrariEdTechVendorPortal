@@ -64,76 +64,89 @@ export async function handleLookupPods(
   input: LookupPodsInput
 ): Promise<ToolResult> {
   const { query } = input;
+  console.log(`[handleLookupPods] Searching for: "${query}"`);
 
-  // Get static demo records (hardcoded)
-  const staticRecords = getMockPodsDatabase();
+  try {
+    // Get static demo records (hardcoded)
+    const staticRecords = getMockPodsDatabase();
+    console.log(`[handleLookupPods] Static records: ${staticRecords.length}`);
 
-  // Get user submissions from Prisma database
-  const dbApplications = await listPodsApplications();
+    // Get user submissions from Prisma database
+    const dbApplications = await listPodsApplications();
+    console.log(`[handleLookupPods] DB applications: ${dbApplications.length}`);
 
-  // Combine: database applications first (most recent), then static records
-  // Dedupe by ID to avoid duplicates
-  const seenIds = new Set<string>();
-  const podsDatabase: Array<{
-    id: string;
-    vendorName: string;
-    applicationName: string;
-    contactEmail: string;
-    status: string;
-    accessTier: string;
-    submittedAt: Date | null;
-    reviewedAt: Date | null;
-    expiresAt: Date | null;
-  }> = [];
+    // Combine: database applications first (most recent), then static records
+    // Dedupe by ID to avoid duplicates
+    const seenIds = new Set<string>();
+    const podsDatabase: Array<{
+      id: string;
+      vendorName: string;
+      applicationName: string;
+      contactEmail: string;
+      status: string;
+      accessTier: string;
+      submittedAt: Date | null;
+      reviewedAt: Date | null;
+      expiresAt: Date | null;
+    }> = [];
 
-  for (const app of dbApplications) {
-    if (!seenIds.has(app.id)) {
-      seenIds.add(app.id);
-      podsDatabase.push(app);
+    for (const app of dbApplications) {
+      if (!seenIds.has(app.id)) {
+        seenIds.add(app.id);
+        podsDatabase.push(app);
+      }
     }
-  }
 
-  for (const app of staticRecords) {
-    if (!seenIds.has(app.id)) {
-      seenIds.add(app.id);
-      podsDatabase.push(app);
+    for (const app of staticRecords) {
+      if (!seenIds.has(app.id)) {
+        seenIds.add(app.id);
+        podsDatabase.push(app);
+      }
     }
-  }
 
-  // Search by ID, vendor name, or email (case-insensitive)
-  const searchLower = query.toLowerCase();
-  const found = podsDatabase.find(
-    (app) =>
-      app.id.toLowerCase() === searchLower ||
-      app.vendorName.toLowerCase().includes(searchLower) ||
-      app.contactEmail.toLowerCase() === searchLower
-  );
+    // Search by ID, vendor name, or email (case-insensitive)
+    const searchLower = query.toLowerCase();
+    const found = podsDatabase.find(
+      (app) =>
+        app.id.toLowerCase() === searchLower ||
+        app.vendorName.toLowerCase().includes(searchLower) ||
+        app.contactEmail.toLowerCase() === searchLower
+    );
 
-  if (!found) {
+    if (!found) {
+      console.log(`[handleLookupPods] No match found. Database has ${podsDatabase.length} records.`);
+      return {
+        success: true,
+        data: null,
+        message: `No PoDS application found for "${query}". This vendor may need to complete the PoDS-Lite application to get started.`,
+      };
+    }
+
+    console.log(`[handleLookupPods] Found: ${found.vendorName} (${found.id})`);
     return {
       success: true,
-      data: null,
-      message: `No PoDS application found for "${query}". This vendor may need to complete the PoDS-Lite application to get started.`,
+      data: {
+        applicationId: found.id,
+        vendorName: found.vendorName,
+        applicationName: found.applicationName,
+        contactEmail: found.contactEmail,
+        status: found.status,
+        accessTier: found.accessTier,
+        submittedAt: found.submittedAt?.toISOString() ?? null,
+        reviewedAt: found.reviewedAt?.toISOString() ?? null,
+        expiresAt: found.expiresAt?.toISOString() ?? null,
+        statusDescription: getPodsStatusDescription(found.status),
+        tierDescription: getAccessTierDescription(found.accessTier),
+      },
+      message: `Found PoDS application for ${found.vendorName}`,
+    };
+  } catch (error) {
+    console.error(`[handleLookupPods] ERROR:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to lookup PoDS application",
     };
   }
-
-  return {
-    success: true,
-    data: {
-      applicationId: found.id,
-      vendorName: found.vendorName,
-      applicationName: found.applicationName,
-      contactEmail: found.contactEmail,
-      status: found.status,
-      accessTier: found.accessTier,
-      submittedAt: found.submittedAt?.toISOString() ?? null,
-      reviewedAt: found.reviewedAt?.toISOString() ?? null,
-      expiresAt: found.expiresAt?.toISOString() ?? null,
-      statusDescription: getPodsStatusDescription(found.status),
-      tierDescription: getAccessTierDescription(found.accessTier),
-    },
-    message: `Found PoDS application for ${found.vendorName}`,
-  };
 }
 
 /**

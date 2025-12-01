@@ -20,8 +20,9 @@ import {
   type ErrorCode,
 } from "@/lib/errors";
 
-// Use edge runtime for streaming
-export const runtime = "edge";
+// Use Node.js runtime to support Prisma database access
+// (Edge runtime doesn't support Prisma - causes lookup_pods to fail)
+export const runtime = "nodejs";
 
 // =============================================================================
 // TYPES

@@ -945,6 +945,113 @@ All sandboxes share these v1.0 components:
 
 ---
 
+## Strategic Initiative: UX Redesign (Dashboard-First + AI Augmentation)
+
+> **Prototypes Created**: See `portal-reimagined.html` and `pitch-presentation.html` in project root
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║     UX REDESIGN - FROM CHAT-FIRST TO DASHBOARD-FIRST                     ║
+║     Status: 📋 SCOPED - Pending Management Review                        ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  CURRENT STATE (Chat-First)          │  PROPOSED STATE (Dashboard-First) ║
+║  ────────────────────────────────────│──────────────────────────────────  ║
+║  • AI chat is primary interface      │  • Traditional dashboard primary   ║
+║  • Users type to do anything         │  • One-click for common tasks      ║
+║  • Discoverability is poor           │  • Clear navigation sidebar        ║
+║  • Repeat tasks require typing       │  • AI assists at specific points   ║
+║  • Great for demos, slow for work    │  • Fast for power users + guided   ║
+║                                                                          ║
+║  KEY INSIGHT: Chat is the guide, not the destination.                    ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  AI AUGMENTATION TOUCHPOINTS (Where AI adds genuine value)               ║
+║  ─────────────────────────────────────────────────────────               ║
+║                                                                          ║
+║  TOUCHPOINT          │  TRIGGER               │  AI BEHAVIOR             ║
+║  ────────────────────│────────────────────────│────────────────────────  ║
+║  Error Diagnosis     │  Click "AI Diagnose"   │  Analyzes config/logs    ║
+║  Response Explainer  │  Click "Explain"       │  Describes tokenized     ║
+║  Upgrade Helper      │  Click "Request"       │  Drafts justification    ║
+║  Message Drafter     │  Click "Draft with AI" │  Generates templates     ║
+║  Onboarding Guide    │  First login / "Help"  │  Shows next steps        ║
+║  Config Validator    │  Pre-submit            │  Validates settings      ║
+║                                                                          ║
+║  NON-AI TASKS (Traditional UI is better)                                 ║
+║  • View credentials    → Card with copy button                           ║
+║  • Check status        → Dashboard with indicators                       ║
+║  • Rotate keys         → Button + confirm modal                          ║
+║  • View audit logs     → Filterable table                                ║
+║  • Download exports    → Direct download button                          ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+### UX Redesign: Key Decisions Required
+
+| # | Decision | Options | Considerations | Owner |
+|---|----------|---------|----------------|-------|
+| UX-D1 | **Keep current chat UI as fallback?** | A) Replace entirely B) Keep as "Chat Mode" toggle C) Deprecate after transition | Option B allows A/B testing; Option A is cleaner | TBD |
+| UX-D2 | **AI panel behavior** | A) Slide-in from right B) Modal overlay C) Inline expansion | Slide-in (A) tested well in prototype; doesn't obscure main content | TBD |
+| UX-D3 | **Component library** | A) Build custom B) Use shadcn/ui C) Use Radix + custom styling | shadcn/ui (B) is Tailwind-native, copy-paste components | TBD |
+| UX-D4 | **Design system ownership** | A) Internal only B) Hire contractor C) Partner with design agency | Depends on timeline and budget | TBD |
+| UX-D5 | **Mobile responsiveness** | A) Desktop-only MVP B) Responsive from start C) Separate mobile app | EdTech IT admins are desktop-primary; (A) acceptable for v1 | TBD |
+| UX-D6 | **Accessibility standard** | A) WCAG 2.1 AA B) WCAG 2.1 AAA C) Best effort | K-12 contracts often require AA compliance; recommend (A) | TBD |
+| UX-D7 | **User testing approach** | A) Internal only B) Beta with 3-5 vendors C) Public beta | Recommend (B) - real feedback without scale risk | TBD |
+
+### UX Redesign: Implementation Phases
+
+| Phase | Focus | Deliverables | Effort | Dependencies |
+|-------|-------|--------------|--------|--------------|
+| **Phase 0: Decision** | Resolve UX-D1 through UX-D7 | Decision document signed off | 1 week | Management review |
+| **Phase 1: Design System** | Colors, typography, components | Figma/code component library | 2 weeks | UX-D3, UX-D4 |
+| **Phase 2: Dashboard Shell** | Layout, navigation, routing | Sidebar + header + routing | 1 week | Phase 1 |
+| **Phase 3: Core Pages** | Status, Credentials, SSO, API | 4 main dashboard pages | 2 weeks | Phase 2 |
+| **Phase 4: AI Integration** | Panel, touchpoints, responses | AI assistance layer | 1 week | Phase 3 |
+| **Phase 5: Migration** | Port existing functionality | All current features working | 2 weeks | Phase 4 |
+| **Phase 6: Polish** | Animations, edge cases, a11y | Production-ready UI | 1 week | Phase 5 |
+
+**Total Estimated Effort**: 10 weeks (can parallelize with backend work)
+
+### UX Redesign: GO/NO-GO Gates
+
+| Gate | Criteria | Status |
+|------|----------|--------|
+| **DECISION** | All UX-D* decisions documented and approved | 📋 Pending |
+| **PROTOTYPE** | Interactive prototype tested with 3+ users | ✅ Done (portal-reimagined.html) |
+| **DESIGN** | Component library covers all current features | 📋 Pending |
+| **PARITY** | All current functionality works in new UI | 📋 Pending |
+| **PERFORMANCE** | Page load < 2s, interactions < 100ms | 📋 Pending |
+| **ACCESSIBILITY** | WCAG 2.1 AA compliance verified | 📋 Pending |
+
+### UX Redesign: Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Scope creep ("while we're at it...") | High | High | Strict feature parity first, enhancements in v2 |
+| User resistance to change | Medium | Medium | Keep chat mode as fallback (UX-D1 Option B) |
+| Timeline pressure | Medium | High | Phase 1-2 can run parallel to v1.0 backend work |
+| Design inconsistency | Medium | Medium | Establish design system before building pages |
+| AI touchpoints feel gimmicky | Low | High | User test each touchpoint; remove if not valuable |
+
+### UX Redesign: Open Questions for Management
+
+1. **Priority vs. v1.0 backend work?** This is UI; v1.0 is infrastructure (PostgreSQL, auth, sessions). Can run in parallel if resourced.
+
+2. **Who owns design?** Options: existing team, contractor, agency partnership. Impacts timeline and budget.
+
+3. **Is current chat UI acceptable for LAUSD demo?** If yes, UX redesign can be post-v1.0. If not, needs to be parallel.
+
+4. **Budget for user testing?** Recommend compensating 3-5 beta vendor users for feedback sessions.
+
+5. **Success metric?** Suggest: "Task completion time 50% faster than chat-first UI" measured via user testing.
+
+---
+
 ## Strategic Vision
 
 ```
@@ -1950,6 +2057,7 @@ Leaves buffer for go-to-market, sales, support
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| Dec 1 | **UX Redesign Initiative Scoped** | Chat-first UI is great for demos but suboptimal for daily vendor use. Scoped dashboard-first approach with AI augmentation at 6 specific touchpoints (error diagnosis, response explanation, upgrade help, message drafting, onboarding, config validation). Created prototypes: `portal-reimagined.html` (full dashboard) and `pitch-presentation.html` (exec slides). 7 key decisions (UX-D1 to UX-D7) documented for management review. Estimated 10 weeks effort, can run parallel to v1.0 backend. Key insight: "Chat is the guide, not the destination." |
 | Nov 30 | **MVP Complete: 10/10 tasks, 1070 tests** | MVP-06 CPaaS demo polish completed with 205 new tests. Created lib/config/cpaas.ts SSOT (pricing, channels, delivery status, LAUSD scale constants). CommTestForm now includes: cost preview section, delivery status simulation (QUEUED→SENT→DELIVERED), privacy explainer panel with FERPA/COPPA badges, scale calculator showing LAUSD-wide costs. Following DEVELOPMENT_PATTERNS.md: centralized config first, then consistency tests, then implementation. Total MVP: 1070 tests, zero bugs in production. |
 | Nov 30 | **CPaaS Provider Stack: Vonage + Sinch** | Updated CPAAS_DEVSPIKE.md from SendGrid/Twilio references to actual providers (Vonage/Sinch). Multi-provider strategy enables: rate negotiation leverage, hedging against single provider dependency, failover for reliability. Added V1-14 (provider abstraction) and V1-15 (margin tracking) to v1.0 backlog as P3 tasks. Demo (MVP-06) abstracts this - vendors see "SchoolDay Secure Network" not provider details. |
 | Nov 30 | **MVP-05 Form Triggers Complete** | 103 tests verifying form trigger system: detection from [FORM:*] markers, tool result showForm handling, all 8 forms render correctly, cross-layer consistency (handlers → useChat → page). Total: 865 tests passing. MVP now 9/10 complete. |
