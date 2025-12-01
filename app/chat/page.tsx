@@ -206,39 +206,86 @@ export default function ChatPage() {
   }, [error, toast]);
 
   // ==========================================================================
-  // RESTORE PoDS DATA FROM LOCALSTORAGE (survives server restarts)
-  // NOTE: vendorState restoration is now handled by VendorProvider (HARD-01)
-  // This effect only restores server-side PoDS data for AI tool lookups
+  // SYNC PoDS DATA: Database-First Hydration Pattern
+  // 1. Sync FROM database to localStorage (ensures fresh data)
+  // 2. Restore TO server any localStorage-only data (survives server restarts)
   // ==========================================================================
 
   useEffect(() => {
-    const restorePodsToServer = async () => {
+    const syncPodsData = async () => {
+      const PODS_BACKUP_KEY = "schoolday_pods_backup";
+
       try {
-        const backup = localStorage.getItem("schoolday_pods_backup");
-        if (!backup) return;
+        // Step 1: Get current localStorage backup
+        const backup = localStorage.getItem(PODS_BACKUP_KEY);
+        const backupList: Array<{
+          id: string;
+          vendorName: string;
+          applicationName: string;
+          contactEmail: string;
+          status: string;
+          accessTier: string;
+          submittedAt: string;
+          reviewedAt: string;
+          expiresAt: string;
+        }> = backup ? JSON.parse(backup) : [];
 
-        const backupList = JSON.parse(backup);
-        if (!Array.isArray(backupList) || backupList.length === 0) return;
+        // Step 2: For each vendor in localStorage, sync FROM database
+        const syncedList = [...backupList];
+        let hasChanges = false;
 
-        // Re-persist each PoDS application to the server (silent - no logging)
-        for (const podsData of backupList) {
+        for (let i = 0; i < syncedList.length; i++) {
+          const cached = syncedList[i];
           try {
-            await persistPodsApplication({
-              ...podsData,
-              submittedAt: new Date(podsData.submittedAt),
-              reviewedAt: new Date(podsData.reviewedAt),
-              expiresAt: new Date(podsData.expiresAt),
-            });
+            // Fetch fresh data from database
+            const response = await fetch(
+              `/api/pods?vendorName=${encodeURIComponent(cached.vendorName)}`
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.application) {
+                const fresh = data.application;
+                // Update localStorage with fresh database values
+                if (
+                  fresh.status !== cached.status ||
+                  fresh.accessTier !== cached.accessTier
+                ) {
+                  syncedList[i] = {
+                    ...cached,
+                    status: fresh.status,
+                    accessTier: fresh.accessTier,
+                    submittedAt: fresh.submittedAt,
+                    reviewedAt: fresh.reviewedAt,
+                    expiresAt: fresh.expiresAt,
+                  };
+                  hasChanges = true;
+                }
+              }
+            } else if (response.status === 404) {
+              // Data exists in localStorage but not in DB - restore to server
+              await persistPodsApplication({
+                ...cached,
+                submittedAt: new Date(cached.submittedAt),
+                reviewedAt: new Date(cached.reviewedAt),
+                expiresAt: new Date(cached.expiresAt),
+              });
+            }
           } catch {
-            // Silent fail - server may already have this data
+            // Silent fail on individual sync - continue with others
           }
         }
+
+        // Step 3: Save updated list if there were changes
+        if (hasChanges) {
+          localStorage.setItem(PODS_BACKUP_KEY, JSON.stringify(syncedList));
+        }
       } catch {
-        // Silent fail on localStorage restore
+        // Silent fail on sync
       }
     };
 
-    restorePodsToServer();
+    syncPodsData();
   }, []); // Run once on mount - no dependencies needed
 
   // ==========================================================================

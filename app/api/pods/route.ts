@@ -58,10 +58,40 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET - List all PoDS applications (for debugging/admin)
+ * GET - List all PoDS applications or fetch by vendorName
+ *
+ * Query params:
+ * - vendorName: Filter by vendor name (returns single application)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const vendorName = searchParams.get("vendorName");
+
+    // If vendorName provided, return single application
+    if (vendorName) {
+      const { getPodsApplicationByVendor } = await import("@/lib/db");
+      const application = await getPodsApplicationByVendor(vendorName);
+
+      if (!application) {
+        return NextResponse.json(
+          { success: false, error: "PoDS application not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        application: {
+          ...application,
+          submittedAt: application.submittedAt.toISOString(),
+          reviewedAt: application.reviewedAt.toISOString(),
+          expiresAt: application.expiresAt.toISOString(),
+        },
+      });
+    }
+
+    // No filter - return all applications
     const applications = await listPodsApplications();
     return NextResponse.json({
       success: true,
