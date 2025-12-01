@@ -20,6 +20,7 @@ import {
   getAuditLogs,
   logAuditEvent,
   listPodsApplications,
+  updateSandboxEndpoints,
 } from "@/lib/db";
 import { resourcesToEndpoints } from "@/lib/config/oneroster";
 import { FORM_TYPES } from "@/lib/config/forms";
@@ -35,6 +36,7 @@ import type {
   GetCredentialsInput,
   CheckStatusInput,
   RequestUpgradeInput,
+  UpdateEndpointsInput,
 } from "./tools";
 
 // =============================================================================
@@ -958,6 +960,78 @@ export async function handleRequestUpgrade(
   };
 }
 
+/**
+ * 13. update_endpoints - Modify allowed OneRoster endpoints
+ */
+export async function handleUpdateEndpoints(
+  input: UpdateEndpointsInput
+): Promise<ToolResult> {
+  const { vendor_id, endpoints, mode = "add" } = input;
+
+  try {
+    // Check if vendor exists
+    const vendor = await getVendor(vendor_id);
+    if (!vendor) {
+      return {
+        success: false,
+        error: `Vendor not found with ID: ${vendor_id}. Please ensure the vendor has completed PoDS-Lite first.`,
+      };
+    }
+
+    // Check if vendor has sandbox credentials
+    const existingSandbox = await getSandbox(vendor_id);
+    if (!existingSandbox) {
+      return {
+        success: false,
+        error:
+          "No sandbox credentials found. Please provision sandbox credentials first before updating endpoints.",
+      };
+    }
+
+    // Update endpoints
+    const updatedSandbox = await updateSandboxEndpoints(
+      vendor_id,
+      endpoints,
+      mode
+    );
+
+    if (!updatedSandbox) {
+      return {
+        success: false,
+        error: "Failed to update endpoints. Please try again.",
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        vendorId: vendor_id,
+        vendorName: vendor.name,
+        mode,
+        previousEndpoints: existingSandbox.allowedEndpoints,
+        updatedEndpoints: updatedSandbox.allowedEndpoints,
+        addedEndpoints:
+          mode === "add"
+            ? updatedSandbox.allowedEndpoints.filter(
+                (ep) => !existingSandbox.allowedEndpoints.includes(ep)
+              )
+            : null,
+      },
+      message:
+        mode === "add"
+          ? `Successfully added ${endpoints.length} endpoint(s) to your sandbox. You now have access to ${updatedSandbox.allowedEndpoints.length} endpoints.`
+          : `Successfully updated your sandbox endpoints. You now have access to ${updatedSandbox.allowedEndpoints.length} endpoints.`,
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    return {
+      success: false,
+      error: `Failed to update endpoints: ${errorMessage}`,
+    };
+  }
+}
+
 // =============================================================================
 // TOOL ROUTER
 // =============================================================================
@@ -1037,6 +1111,11 @@ export async function executeToolCall(
       case "request_upgrade":
         return await handleRequestUpgrade(
           params as unknown as RequestUpgradeInput
+        );
+
+      case "update_endpoints":
+        return await handleUpdateEndpoints(
+          params as unknown as UpdateEndpointsInput
         );
 
       default:

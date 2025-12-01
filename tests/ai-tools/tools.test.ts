@@ -20,8 +20,8 @@ import {
 // =============================================================================
 
 describe('TOOL_DEFINITIONS', () => {
-  it('should have exactly 12 tools defined', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(12);
+  it('should have exactly 13 tools defined', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(13);
   });
 
   it('should have all expected tool names', () => {
@@ -38,6 +38,7 @@ describe('TOOL_DEFINITIONS', () => {
       'get_credentials',
       'check_status',
       'request_upgrade',
+      'update_endpoints',
     ];
 
     const actualNames = TOOL_DEFINITIONS.map((t) => t.name);
@@ -214,7 +215,7 @@ describe('getToolNames', () => {
   it('should return array of all tool names', () => {
     const names = getToolNames();
     expect(Array.isArray(names)).toBe(true);
-    expect(names).toHaveLength(12);
+    expect(names).toHaveLength(13);
   });
 
   it('should return unique names', () => {
@@ -337,8 +338,9 @@ describe('Type exports', () => {
       'get_credentials',
       'check_status',
       'request_upgrade',
+      'update_endpoints',
     ];
     // If this compiles, the types are correct
-    expect(toolNames).toHaveLength(12);
+    expect(toolNames).toHaveLength(13);
   });
 });

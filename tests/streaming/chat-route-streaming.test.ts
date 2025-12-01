@@ -427,13 +427,14 @@ describe("MVP-04: Chat Route Streaming", () => {
   });
 
   // ===========================================================================
-  // TESTS: EDGE RUNTIME
+  // TESTS: NODE.JS RUNTIME (changed from Edge for Prisma compatibility)
   // ===========================================================================
 
-  describe("Edge Runtime Configuration", () => {
-    it("should export edge runtime", () => {
+  describe("Node.js Runtime Configuration", () => {
+    it("should export nodejs runtime for Prisma compatibility", () => {
       const code = getRouteCode();
-      expect(code).toContain('export const runtime = "edge"');
+      // Changed from Edge to Node.js runtime to support Prisma database operations
+      expect(code).toContain('export const runtime = "nodejs"');
     });
   });
 

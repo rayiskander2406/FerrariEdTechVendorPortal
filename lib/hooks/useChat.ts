@@ -375,6 +375,22 @@ export function useChat(): UseChatReturn {
                         setFormData(parsed.result.data as Record<string, unknown>);
                       }
                     }
+
+                    // Update vendor state when update_endpoints succeeds
+                    const toolCall = currentToolCalls.find((tc) => tc.id === parsed.id);
+                    if (
+                      toolCall?.name === "update_endpoints" &&
+                      parsed.result.success &&
+                      parsed.result.data?.updatedEndpoints &&
+                      vendorState.credentials
+                    ) {
+                      contextUpdateVendorState({
+                        credentials: {
+                          ...vendorState.credentials,
+                          allowedEndpoints: parsed.result.data.updatedEndpoints as string[],
+                        },
+                      });
+                    }
                   }
                   break;
 

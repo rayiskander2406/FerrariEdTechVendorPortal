@@ -108,6 +108,12 @@ export const AI_TOOLS = {
     description: "Initiate tier upgrade request",
     category: TOOL_CATEGORIES.ONBOARDING,
   },
+  UPDATE_ENDPOINTS: {
+    id: "update_endpoints",
+    label: "Update Endpoints",
+    description: "Modify allowed OneRoster API endpoints",
+    category: TOOL_CATEGORIES.INTEGRATION,
+  },
 } as const;
 
 // =============================================================================
@@ -141,7 +147,7 @@ export const ALL_TOOL_IDS: readonly ToolId[] = Object.values(AI_TOOLS).map(
 ) as readonly ToolId[];
 
 /** Total number of AI tools */
-export const TOOL_COUNT = 12;
+export const TOOL_COUNT = 13;
 
 // =============================================================================
 // ZOD SCHEMAS
@@ -161,6 +167,7 @@ export const ToolIdEnum = z.enum([
   "get_credentials",
   "check_status",
   "request_upgrade",
+  "update_endpoints",
 ]);
 
 /** Zod enum for tool keys (for runtime validation) */
@@ -177,6 +184,7 @@ export const ToolKeyEnum = z.enum([
   "GET_CREDENTIALS",
   "CHECK_STATUS",
   "REQUEST_UPGRADE",
+  "UPDATE_ENDPOINTS",
 ]);
 
 // =============================================================================

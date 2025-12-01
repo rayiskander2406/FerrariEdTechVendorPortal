@@ -281,6 +281,24 @@ const mockData = factory.create({ seed: 12345 });
 
 ## Testing Approach
 
+### MANDATORY: Tests Required for All Code Changes
+
+> **STOP**: Before declaring any fix, feature, or refactor complete, you MUST write tests.
+> This is not optional. Do not wait for the user to ask "did you write tests?"
+
+**For every code change, write:**
+1. **Unit tests** for the specific function/component modified
+2. **Integration tests** if the change spans multiple layers (DB → API → UI)
+3. **Regression tests** that reproduce the original bug (if fixing a bug)
+
+**Checklist before completing work:**
+- [ ] New code has corresponding test file
+- [ ] Tests actually exercise the new code path
+- [ ] Tests verify the fix works, not just that nothing broke
+- [ ] `npm test` passes with new tests included
+
+### Test Categories
+
 - Unit tests for tool handlers and utilities
 - Integration tests for API routes
 - Scenario tests for demo flows

@@ -21,6 +21,7 @@ import {
   handleGetCredentials,
   handleCheckStatus,
   handleRequestUpgrade,
+  handleUpdateEndpoints,
   executeToolCall,
 } from '@/lib/ai/handlers';
 import { createVendor, createSandbox, clearAllStores } from '@/lib/db';
@@ -878,6 +879,162 @@ describe('handleRequestUpgrade', () => {
 });
 
 // =============================================================================
+// 13. UPDATE_ENDPOINTS TESTS
+// =============================================================================
+
+describe('handleUpdateEndpoints', () => {
+  it('should return error for non-existent vendor', async () => {
+    const result = await handleUpdateEndpoints({
+      vendor_id: 'non-existent-id',
+      endpoints: ['/users', '/classes'],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Vendor not found');
+  });
+
+  it('should return error for vendor without sandbox', async () => {
+    const vendor = await createVendor({
+      podsLiteInput: createMockPodsLiteInput(),
+    });
+    // Don't create sandbox
+
+    const result = await handleUpdateEndpoints({
+      vendor_id: vendor.id,
+      endpoints: ['/users'],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('No sandbox credentials found');
+  });
+
+  it('should add endpoints in add mode (default)', async () => {
+    const vendor = await createVendor({
+      podsLiteInput: createMockPodsLiteInput(),
+    });
+    await createSandbox(vendor.id);
+
+    const result = await handleUpdateEndpoints({
+      vendor_id: vendor.id,
+      endpoints: ['/academicSessions', '/demographics'],
+    });
+
+    expect(result.success).toBe(true);
+
+    const data = result.data as {
+      mode?: string;
+      updatedEndpoints?: string[];
+      addedEndpoints?: string[];
+    };
+    expect(data.mode).toBe('add');
+    expect(data.updatedEndpoints).toContain('/academicSessions');
+    expect(data.updatedEndpoints).toContain('/demographics');
+    expect(data.addedEndpoints?.length).toBeGreaterThan(0);
+  });
+
+  it('should replace endpoints in replace mode', async () => {
+    const vendor = await createVendor({
+      podsLiteInput: createMockPodsLiteInput(),
+    });
+    await createSandbox(vendor.id);
+
+    const result = await handleUpdateEndpoints({
+      vendor_id: vendor.id,
+      endpoints: ['/users', '/orgs'],
+      mode: 'replace',
+    });
+
+    expect(result.success).toBe(true);
+
+    const data = result.data as {
+      mode?: string;
+      updatedEndpoints?: string[];
+      addedEndpoints?: string[] | null;
+    };
+    expect(data.mode).toBe('replace');
+    expect(data.updatedEndpoints).toEqual(['/users', '/orgs']);
+    expect(data.addedEndpoints).toBeNull(); // null in replace mode
+  });
+
+  it('should include previous and updated endpoints in response', async () => {
+    const vendor = await createVendor({
+      podsLiteInput: createMockPodsLiteInput(),
+    });
+    await createSandbox(vendor.id);
+
+    const result = await handleUpdateEndpoints({
+      vendor_id: vendor.id,
+      endpoints: ['/demographics'],
+      mode: 'add',
+    });
+
+    expect(result.success).toBe(true);
+
+    const data = result.data as {
+      previousEndpoints?: string[];
+      updatedEndpoints?: string[];
+    };
+    expect(data.previousEndpoints).toBeDefined();
+    expect(data.updatedEndpoints).toBeDefined();
+    expect(Array.isArray(data.previousEndpoints)).toBe(true);
+    expect(Array.isArray(data.updatedEndpoints)).toBe(true);
+  });
+
+  it('should include vendor name in response', async () => {
+    const vendor = await createVendor({
+      podsLiteInput: createMockPodsLiteInput({
+        vendorName: 'Endpoint Test Vendor',
+      }),
+    });
+    await createSandbox(vendor.id);
+
+    const result = await handleUpdateEndpoints({
+      vendor_id: vendor.id,
+      endpoints: ['/users'],
+    });
+
+    expect(result.success).toBe(true);
+
+    const data = result.data as { vendorName?: string };
+    expect(data.vendorName).toBe('Endpoint Test Vendor');
+  });
+
+  it('should generate appropriate success message for add mode', async () => {
+    const vendor = await createVendor({
+      podsLiteInput: createMockPodsLiteInput(),
+    });
+    await createSandbox(vendor.id);
+
+    const result = await handleUpdateEndpoints({
+      vendor_id: vendor.id,
+      endpoints: ['/demographics'],
+      mode: 'add',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('added');
+    expect(result.message).toContain('endpoint');
+  });
+
+  it('should generate appropriate success message for replace mode', async () => {
+    const vendor = await createVendor({
+      podsLiteInput: createMockPodsLiteInput(),
+    });
+    await createSandbox(vendor.id);
+
+    const result = await handleUpdateEndpoints({
+      vendor_id: vendor.id,
+      endpoints: ['/users', '/classes'],
+      mode: 'replace',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('updated');
+    expect(result.message).toContain('endpoint');
+  });
+});
+
+// =============================================================================
 // TOOL ROUTER TESTS
 // =============================================================================
 
@@ -893,6 +1050,7 @@ describe('executeToolCall', () => {
       { name: 'get_audit_logs', params: { vendor_id: 'test-id' } },
       { name: 'get_credentials', params: { vendor_id: 'test-id' } },
       { name: 'check_status', params: { vendor_id: 'test-id' } },
+      { name: 'update_endpoints', params: { vendor_id: 'test-id', endpoints: ['/users'] } },
     ];
 
     for (const test of toolTests) {

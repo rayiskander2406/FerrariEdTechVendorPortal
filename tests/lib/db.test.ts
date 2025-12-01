@@ -16,6 +16,7 @@ import {
   createSandbox,
   getSandbox,
   updateSandboxLastUsed,
+  updateSandboxEndpoints,
   revokeSandbox,
   logAuditEvent,
   getAuditLogs,
@@ -394,6 +395,164 @@ describe('Sandbox Operations', () => {
     it('should return null for non-existent sandbox', async () => {
       const result = await revokeSandbox('non-existent');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('updateSandboxEndpoints', () => {
+    it('should add new endpoints in add mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const originalSandbox = await getSandbox(vendor.id);
+      const originalCount = originalSandbox?.allowedEndpoints.length ?? 0;
+
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['/academicSessions'],
+        'add'
+      );
+
+      expect(updated).not.toBeNull();
+      expect(updated?.allowedEndpoints).toContain('/academicSessions');
+      expect(updated?.allowedEndpoints.length).toBeGreaterThanOrEqual(originalCount);
+    });
+
+    it('should replace all endpoints in replace mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const newEndpoints = ['/users', '/classes'];
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        newEndpoints,
+        'replace'
+      );
+
+      expect(updated).not.toBeNull();
+      expect(updated?.allowedEndpoints).toEqual(newEndpoints);
+    });
+
+    it('should default to add mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      const originalSandbox = await getSandbox(vendor.id);
+      const originalEndpoints = originalSandbox?.allowedEndpoints ?? [];
+
+      const updated = await updateSandboxEndpoints(vendor.id, ['/demographics']);
+
+      expect(updated).not.toBeNull();
+      // Should have all original endpoints plus /demographics
+      for (const ep of originalEndpoints) {
+        expect(updated?.allowedEndpoints).toContain(ep);
+      }
+      expect(updated?.allowedEndpoints).toContain('/demographics');
+    });
+
+    it('should deduplicate endpoints in add mode', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      // Try to add an endpoint that already exists
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['/users', '/users', '/classes'],
+        'add'
+      );
+
+      expect(updated).not.toBeNull();
+      // Count occurrences of /users - should only appear once
+      const usersCount = updated?.allowedEndpoints.filter(ep => ep === '/users').length;
+      expect(usersCount).toBe(1);
+    });
+
+    it('should validate and normalize endpoint paths', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      // Test with endpoints without leading slash
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['users', 'classes'],
+        'replace'
+      );
+
+      expect(updated).not.toBeNull();
+      expect(updated?.allowedEndpoints).toContain('/users');
+      expect(updated?.allowedEndpoints).toContain('/classes');
+    });
+
+    it('should return null for non-existent vendor', async () => {
+      const result = await updateSandboxEndpoints(
+        'non-existent-vendor',
+        ['/users'],
+        'add'
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for vendor without sandbox', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      // Don't create sandbox
+
+      const result = await updateSandboxEndpoints(
+        vendor.id,
+        ['/users'],
+        'add'
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should log audit event when endpoints updated', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      await updateSandboxEndpoints(vendor.id, ['/demographics'], 'add');
+
+      const logs = await getAuditLogs(vendor.id);
+      const endpointUpdateLog = logs.find(
+        log => log.action === 'SANDBOX_ENDPOINTS_UPDATED'
+      );
+
+      expect(endpointUpdateLog).toBeDefined();
+      expect(endpointUpdateLog?.details).toHaveProperty('mode', 'add');
+      expect(endpointUpdateLog?.details).toHaveProperty('previousEndpoints');
+      expect(endpointUpdateLog?.details).toHaveProperty('newEndpoints');
+    });
+
+    it('should fall back to defaults for invalid endpoints', async () => {
+      const vendor = await createVendor({
+        podsLiteInput: createMockPodsLiteInput(),
+      });
+      await createSandbox(vendor.id);
+
+      // Try to set only invalid endpoints
+      const updated = await updateSandboxEndpoints(
+        vendor.id,
+        ['/invalid', '/not-real'],
+        'replace'
+      );
+
+      expect(updated).not.toBeNull();
+      // Should fall back to default endpoints since all provided were invalid
+      expect(updated?.allowedEndpoints.length).toBeGreaterThan(0);
+      expect(updated?.allowedEndpoints).toContain('/users');
     });
   });
 });

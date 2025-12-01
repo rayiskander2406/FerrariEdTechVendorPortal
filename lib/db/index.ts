@@ -435,6 +435,62 @@ export async function updateSandboxLastUsed(vendorId: string): Promise<void> {
 }
 
 /**
+ * Update sandbox allowed endpoints
+ * @param vendorId - The vendor's ID
+ * @param endpoints - Array of OneRoster endpoints to allow
+ * @param mode - "replace" replaces all endpoints, "add" adds to existing
+ */
+export async function updateSandboxEndpoints(
+  vendorId: string,
+  endpoints: string[],
+  mode: "replace" | "add" = "add"
+): Promise<SandboxCredentials | null> {
+  try {
+    const existingSandbox = await getSandbox(vendorId);
+    if (!existingSandbox) {
+      return null;
+    }
+
+    // Validate endpoints using centralized config
+    const validatedEndpoints = validateEndpoints(endpoints);
+
+    // Determine final endpoints based on mode
+    let finalEndpoints: string[];
+    if (mode === "add") {
+      // Merge existing with new, deduplicate
+      const merged = new Set([
+        ...existingSandbox.allowedEndpoints,
+        ...validatedEndpoints,
+      ]);
+      finalEndpoints = Array.from(merged);
+    } else {
+      finalEndpoints = validatedEndpoints;
+    }
+
+    const sandbox = await prisma.sandboxCredentials.update({
+      where: { vendorId },
+      data: { allowedEndpoints: JSON.stringify(finalEndpoints) },
+    });
+
+    await logAuditEvent({
+      vendorId,
+      action: "SANDBOX_ENDPOINTS_UPDATED",
+      resourceType: "sandbox",
+      resourceId: sandbox.id,
+      details: {
+        mode,
+        previousEndpoints: existingSandbox.allowedEndpoints,
+        newEndpoints: finalEndpoints,
+      },
+    });
+
+    return toSandboxCredentials(sandbox);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Revoke sandbox credentials
  */
 export async function revokeSandbox(

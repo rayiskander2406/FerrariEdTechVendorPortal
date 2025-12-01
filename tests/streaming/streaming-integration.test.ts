@@ -274,11 +274,12 @@ describe("MVP-04: Streaming Integration", () => {
       expect(routeCode).toContain('Connection: "keep-alive"');
     });
 
-    it("should use edge runtime", async () => {
+    it("should use nodejs runtime for Prisma compatibility", async () => {
       const routePath = path.resolve(__dirname, "../../app/api/chat/route.ts");
       const routeCode = fs.readFileSync(routePath, "utf-8");
 
-      expect(routeCode).toContain('runtime = "edge"');
+      // Changed from Edge to Node.js runtime to support Prisma database operations
+      expect(routeCode).toContain('runtime = "nodejs"');
     });
   });
 

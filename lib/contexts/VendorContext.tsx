@@ -91,10 +91,14 @@ export function VendorProvider({ children }: VendorProviderProps) {
   // HYDRATION: Load from localStorage on mount (client-side only)
   // ==========================================================================
   useEffect(() => {
+    let parsedVendorId: string | null = null;
+
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<VendorState>;
+        parsedVendorId = parsed.vendorId ?? null;
+
         // Merge with initial state to ensure all fields exist
         setVendorState((prev) => ({
           ...prev,
@@ -116,8 +120,56 @@ export function VendorProvider({ children }: VendorProviderProps) {
     } catch {
       // Silent fail on hydration - state will use defaults
     }
+
     setIsHydrated(true);
+
+    // Sync credentials from database if we have a vendorId
+    // This ensures localStorage cache doesn't get stale
+    if (parsedVendorId) {
+      syncCredentialsFromDatabase(parsedVendorId);
+    }
   }, []);
+
+  // ==========================================================================
+  // DATABASE SYNC: Fetch fresh credentials from server
+  // ==========================================================================
+  const syncCredentialsFromDatabase = async (vendorId: string) => {
+    try {
+      // Use POST which returns full credentials including apiSecret
+      const response = await fetch("/api/sandbox/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendorId }),
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data.success && data.sandbox) {
+        // Update credentials with fresh data from database
+        const freshCredentials: SandboxCredentials = {
+          id: data.sandbox.id,
+          vendorId: data.sandbox.vendorId,
+          apiKey: data.sandbox.apiKey,
+          apiSecret: data.sandbox.apiSecret,
+          baseUrl: data.sandbox.baseUrl,
+          environment: data.sandbox.environment as "sandbox" | "production",
+          status: data.sandbox.status as "PROVISIONING" | "ACTIVE" | "EXPIRED" | "REVOKED",
+          expiresAt: new Date(data.sandbox.expiresAt),
+          createdAt: new Date(data.sandbox.createdAt || Date.now()),
+          rateLimitPerMinute: data.sandbox.rateLimitPerMinute,
+          allowedEndpoints: data.sandbox.allowedEndpoints,
+        };
+
+        setVendorState((prev) => ({
+          ...prev,
+          credentials: freshCredentials,
+        }));
+      }
+    } catch {
+      // Silent fail - localStorage data is still available as fallback
+    }
+  };
 
   // ==========================================================================
   // PERSISTENCE: Save to localStorage on every state change (after hydration)

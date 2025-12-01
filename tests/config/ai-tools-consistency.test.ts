@@ -100,6 +100,12 @@ const EXPECTED_AI_TOOLS = {
     description: "Initiate tier upgrade request",
     category: "onboarding",
   },
+  UPDATE_ENDPOINTS: {
+    id: "update_endpoints",
+    label: "Update Endpoints",
+    description: "Modify allowed OneRoster API endpoints",
+    category: "integration",
+  },
 } as const;
 
 type ToolKey = keyof typeof EXPECTED_AI_TOOLS;
@@ -114,8 +120,8 @@ const ALL_TOOL_IDS: ToolId[] = Object.values(EXPECTED_AI_TOOLS).map((t) => t.id)
 
 describe("AI Tools Centralized Config", () => {
   describe("EXPECTED_AI_TOOLS structure", () => {
-    it("should define exactly 12 AI tools", () => {
-      expect(Object.keys(EXPECTED_AI_TOOLS)).toHaveLength(12);
+    it("should define exactly 13 AI tools", () => {
+      expect(Object.keys(EXPECTED_AI_TOOLS)).toHaveLength(13);
     });
 
     it("should have all required tools", () => {
@@ -132,6 +138,7 @@ describe("AI Tools Centralized Config", () => {
         "GET_CREDENTIALS",
         "CHECK_STATUS",
         "REQUEST_UPGRADE",
+        "UPDATE_ENDPOINTS",
       ];
 
       requiredTools.forEach((tool) => {
@@ -319,8 +326,8 @@ describe("AI Tools Helper Functions", () => {
 
 describe("AI Tools Derived Constants", () => {
   describe("ALL_TOOL_KEYS", () => {
-    it("should contain exactly 12 keys", () => {
-      expect(ALL_TOOL_KEYS).toHaveLength(12);
+    it("should contain exactly 13 keys", () => {
+      expect(ALL_TOOL_KEYS).toHaveLength(13);
     });
 
     it("should be in UPPERCASE_SNAKE_CASE format", () => {
@@ -336,8 +343,8 @@ describe("AI Tools Derived Constants", () => {
   });
 
   describe("ALL_TOOL_IDS", () => {
-    it("should contain exactly 12 IDs", () => {
-      expect(ALL_TOOL_IDS).toHaveLength(12);
+    it("should contain exactly 13 IDs", () => {
+      expect(ALL_TOOL_IDS).toHaveLength(13);
     });
 
     it("should be in lowercase_snake_case format", () => {
@@ -449,6 +456,12 @@ describe("Cross-Layer AI Tool Name Consistency", () => {
       const content = fs.readFileSync(toolsPath, "utf-8");
       expect(content).toContain('name: "request_upgrade"');
     });
+
+    it("should define update_endpoints tool", () => {
+      const toolsPath = path.resolve(__dirname, "../../lib/ai/tools.ts");
+      const content = fs.readFileSync(toolsPath, "utf-8");
+      expect(content).toContain('name: "update_endpoints"');
+    });
   });
 
   describe("lib/ai/handlers.ts - handleToolCall switch cases", () => {
@@ -534,6 +547,12 @@ describe("Cross-Layer AI Tool Name Consistency", () => {
       const content = fs.readFileSync(handlersPath, "utf-8");
       expect(content).toContain('case "request_upgrade"');
     });
+
+    it("should have case for update_endpoints", () => {
+      const handlersPath = path.resolve(__dirname, "../../lib/ai/handlers.ts");
+      const content = fs.readFileSync(handlersPath, "utf-8");
+      expect(content).toContain('case "update_endpoints"');
+    });
   });
 });
 
@@ -571,17 +590,17 @@ describe("Tool Count Consistency Across Layers", () => {
 
   it("should have same number of tools in TOOL_DEFINITIONS and expected config", () => {
     const definitionCount = countToolDefinitions();
-    expect(definitionCount).toBe(12);
+    expect(definitionCount).toBe(13);
   });
 
   it("should have same number of switch cases as tools", () => {
     const caseCount = countHandlerCases();
-    expect(caseCount).toBe(12);
+    expect(caseCount).toBe(13);
   });
 
   it("should have same number of types in ToolName union as tools", () => {
     const typeCount = countToolNameUnion();
-    expect(typeCount).toBe(12);
+    expect(typeCount).toBe(13);
   });
 
   it("should have TOOL_DEFINITIONS, handler cases, and ToolName all match", () => {
@@ -804,6 +823,7 @@ describe("Type Safety", () => {
         "GET_CREDENTIALS",
         "CHECK_STATUS",
         "REQUEST_UPGRADE",
+        "UPDATE_ENDPOINTS",
       ];
       validKeys.forEach((key) => {
         expect(EXPECTED_AI_TOOLS[key]).toBeDefined();
