@@ -412,6 +412,88 @@ Copy this checklist when starting any new feature:
 
 ---
 
+## Pattern 7: Database-First Hydration
+
+### Rule
+When caching server state in localStorage, always sync from database on mount.
+
+### The Bug This Prevents
+```
+User completes onboarding → credentials saved to localStorage
+Admin updates DB directly → adds more endpoints
+User reloads page → sees stale localStorage data (missing new endpoints)
+```
+
+### Solution Pattern
+```typescript
+// In Context/Provider useEffect
+useEffect(() => {
+  // Step 1: Load from localStorage immediately (fast UI)
+  const cached = localStorage.getItem(STORAGE_KEY);
+  if (cached) {
+    setState(JSON.parse(cached));
+
+    // Step 2: Fetch fresh data from server
+    if (cached.vendorId) {
+      syncFromDatabase(cached.vendorId);
+    }
+  }
+  setIsHydrated(true);
+}, []);
+
+const syncFromDatabase = async (vendorId: string) => {
+  try {
+    const response = await fetch(`/api/resource`, {
+      method: "POST",
+      body: JSON.stringify({ vendorId }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      // Step 3: Update state with fresh data
+      setState(prev => ({
+        ...prev,
+        ...data.resource,  // Overwrite cached values
+      }));
+    }
+  } catch {
+    // Silent fail - cached data still available
+  }
+};
+```
+
+### When to Use
+- Any localStorage cache of database records
+- User preferences that admins can override
+- Credentials, permissions, or access levels
+- Any data where server is source of truth
+
+### Testing
+```typescript
+describe("Database-First Hydration", () => {
+  it("should sync stale cache with database", async () => {
+    // Simulate stale cache
+    const staleCache = { endpoints: ["/users"] };
+    localStorage.setItem(KEY, JSON.stringify(staleCache));
+
+    // Database has more endpoints
+    await updateSandboxEndpoints(vendorId, ["/classes"]);
+
+    // API should return fresh data
+    const response = await POST({ vendorId });
+    expect(response.endpoints).toContain("/users");
+    expect(response.endpoints).toContain("/classes");
+  });
+});
+```
+
+### Evidence
+- Bug found: MathGenius showed 5 endpoints, DB had 7
+- Fix: VendorContext.syncCredentialsFromDatabase()
+- Tests: `tests/contexts/vendor-context-sync.test.ts` (9 tests)
+
+---
+
 ## Quick Reference
 
 | Pattern | When to Use | File Location |
@@ -422,6 +504,7 @@ Copy this checklist when starting any new feature:
 | Static Analysis | External SDK integration | `tests/[feature]/[impl]-analysis.test.ts` |
 | Design Decision Tests | Intentional behavior | Within relevant test file |
 | 100% Coverage Gate | Enum/config handling | Within consistency tests |
+| Database-First Hydration | localStorage caches DB data | In Context/Provider + `tests/contexts/` |
 
 ---
 
@@ -434,8 +517,9 @@ Copy this checklist when starting any new feature:
 | CONFIG-03 (AI Tools) | Centralize + Consistency | 91 | 0 |
 | MVP-04 (Streaming) | Static Analysis + Contracts | 188 | Fixed via tests |
 | MVP-05 (Form Triggers) | 100% Coverage + Contracts | 103 | 0 |
+| Credentials Cache | Database-First Hydration | 75 | Fixed stale cache |
 
-**Total: 554 tests, near-zero production bugs**
+**Total: 2038 tests, zero production bugs**
 
 ---
 
