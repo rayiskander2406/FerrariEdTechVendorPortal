@@ -4,6 +4,11 @@
  * This endpoint handles vendor creation/lookup to ensure data is stored
  * on the server where AI handlers can access it.
  *
+ * Security features:
+ * - Rate limiting: 60 requests/minute per IP
+ * - Payload validation: 1MB max, 10k char strings
+ * - XSS sanitization: All string inputs escaped
+ *
  * CRITICAL: This solves the client/server memory isolation issue where
  * vendors created in browser memory couldn't be found by server-side AI tools.
  */
@@ -11,10 +16,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createVendor, getVendor, getVendorByEmail } from "@/lib/db";
 import type { PodsLiteInput, AccessTier } from "@/lib/types";
+import {
+  securityCheck,
+  DEFAULT_RATE_LIMIT,
+  DEFAULT_PAYLOAD_CONFIG,
+  getClientId,
+  checkRateLimit,
+  createRateLimitHeaders,
+} from "@/lib/security";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Security check: rate limiting + payload validation + XSS sanitization
+    const security = await securityCheck(request, {
+      rateLimit: DEFAULT_RATE_LIMIT,
+      payload: DEFAULT_PAYLOAD_CONFIG,
+    });
+
+    if (!security.passed) {
+      return security.response!;
+    }
+
+    const body = security.body as { podsLiteInput?: PodsLiteInput; accessTier?: AccessTier };
 
     // Validate required fields
     if (!body.podsLiteInput) {
@@ -27,7 +50,7 @@ export async function POST(request: NextRequest) {
     const podsLiteInput: PodsLiteInput = body.podsLiteInput;
     const accessTier: AccessTier = body.accessTier ?? "PRIVACY_SAFE";
 
-    // Create vendor on server-side
+    // Create vendor on server-side (input already sanitized by securityCheck)
     const vendor = await createVendor({ podsLiteInput, accessTier });
 
     // Note: Vendor ID/name intentionally not logged to avoid PII leakage
@@ -55,6 +78,24 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit check for GET requests
+    const clientId = getClientId(request);
+    const rateLimitResult = checkRateLimit(clientId, DEFAULT_RATE_LIMIT);
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        {
+          error: "Too many requests",
+          retryAfter: rateLimitResult.retryAfter,
+          resetAt: rateLimitResult.resetAt.toISOString(),
+        },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimitResult),
+        }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const email = searchParams.get("email");

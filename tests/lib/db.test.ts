@@ -281,7 +281,7 @@ describe('Sandbox Operations', () => {
 
       expect(sandbox.id).toBeDefined();
       expect(sandbox.vendorId).toBe(vendor.id);
-      expect(sandbox.apiKey).toMatch(/^sk_test_/);
+      expect(sandbox.apiKey).toMatch(/^sbox_test_/);
       expect(sandbox.apiSecret.length).toBe(64);
       expect(sandbox.status).toBe('ACTIVE');
       expect(sandbox.environment).toBe('sandbox');

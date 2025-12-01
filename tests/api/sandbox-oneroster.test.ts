@@ -72,7 +72,7 @@ describe("OneRoster Sandbox API - Authentication", () => {
 
   it("should accept valid sandbox API key with Bearer token", async () => {
     const request = createMockRequest("/students", {
-      headers: { Authorization: "Bearer sk_test_123456" },
+      headers: { Authorization: "Bearer sbox_test_1234567890123456789012" },
     });
     const response = await GET(request, { params: createParams(["students"]) });
 
@@ -81,7 +81,7 @@ describe("OneRoster Sandbox API - Authentication", () => {
 
   it("should accept valid sandbox API key with X-API-Key header", async () => {
     const request = createMockRequest("/students", {
-      headers: { "X-API-Key": "sk_test_123456" },
+      headers: { "X-API-Key": "sbox_test_1234567890123456789012" },
     });
     const response = await GET(request, { params: createParams(["students"]) });
 
@@ -103,7 +103,7 @@ describe("OneRoster Sandbox API - Authentication", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /students", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list students with pagination", async () => {
     const request = createMockRequest("/students", { headers });
@@ -203,7 +203,7 @@ describe("OneRoster Sandbox API - /students", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /teachers", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list teachers with pagination", async () => {
     const request = createMockRequest("/teachers", { headers });
@@ -246,7 +246,7 @@ describe("OneRoster Sandbox API - /teachers", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /classes", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list classes with pagination", async () => {
     const request = createMockRequest("/classes", { headers });
@@ -301,7 +301,7 @@ describe("OneRoster Sandbox API - /classes", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /schools", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list schools", async () => {
     const request = createMockRequest("/schools", { headers });
@@ -340,7 +340,7 @@ describe("OneRoster Sandbox API - /schools", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /enrollments", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list enrollments", async () => {
     const request = createMockRequest("/enrollments", { headers });
@@ -382,7 +382,7 @@ describe("OneRoster Sandbox API - /enrollments", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /academicSessions", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list academic sessions", async () => {
     const request = createMockRequest("/academicSessions", { headers });
@@ -416,7 +416,7 @@ describe("OneRoster Sandbox API - /academicSessions", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /orgs", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list orgs including district", async () => {
     const request = createMockRequest("/orgs", { headers });
@@ -454,7 +454,7 @@ describe("OneRoster Sandbox API - /orgs", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - /courses", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should list courses", async () => {
     const request = createMockRequest("/courses", { headers });
@@ -487,7 +487,7 @@ describe("OneRoster Sandbox API - /courses", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - Error Handling", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should return 404 for unknown endpoint", async () => {
     const request = createMockRequest("/unknown", { headers });
@@ -527,7 +527,7 @@ describe("OneRoster Sandbox API - CORS", () => {
 
   it("should include CORS headers in responses", async () => {
     const request = createMockRequest("/students", {
-      headers: { Authorization: "Bearer sk_test_123456" },
+      headers: { Authorization: "Bearer sbox_test_1234567890123456789012" },
     });
     const response = await GET(request, { params: createParams(["students"]) });
 
@@ -540,7 +540,7 @@ describe("OneRoster Sandbox API - CORS", () => {
 // =============================================================================
 
 describe("OneRoster Sandbox API - Response Headers", () => {
-  const headers = { Authorization: "Bearer sk_test_123456" };
+  const headers = { Authorization: "Bearer sbox_test_1234567890123456789012" };
 
   it("should include rate limit headers", async () => {
     const request = createMockRequest("/students", { headers });

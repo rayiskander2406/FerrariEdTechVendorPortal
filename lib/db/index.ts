@@ -88,7 +88,7 @@ function generateUuid(): string {
  * Generate a test API key
  */
 function generateApiKey(): string {
-  return `sk_test_${randomHex(16)}`;
+  return `sbox_test_${randomHex(16)}`;
 }
 
 /**

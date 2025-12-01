@@ -73,7 +73,7 @@ async function runTests() {
   const sandbox = await createSandbox(vendor.id);
   console.log(`   Sandbox ID: ${sandbox.id}`);
   console.log(`   API Key: ${sandbox.apiKey}`);
-  console.log(`   API Key format valid: ${sandbox.apiKey.startsWith("sk_test_")}`);
+  console.log(`   API Key format valid: ${sandbox.apiKey.startsWith("sbox_test_")}`);
   console.log(`   Secret length: ${sandbox.apiSecret.length} chars`);
   console.log(`   Base URL: ${sandbox.baseUrl}`);
   console.log(`   Environment: ${sandbox.environment}`);

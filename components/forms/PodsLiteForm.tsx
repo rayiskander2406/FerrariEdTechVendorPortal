@@ -287,7 +287,7 @@ function generateVendorCredentials(
     const endpoints = mappedEndpoints ?? [...DEFAULT_ONEROSTER_ENDPOINTS];
 
     credentials.oneRoster = {
-      apiKey: `sk_test_${randomHex(24)}`,
+      apiKey: `sbox_test_${randomHex(24)}`,
       apiSecret: `sk_secret_${randomHex(32)}`,
       baseUrl: "https://sandbox.lausd-data.schoolday.com/ims/oneroster/v1p2",
       vendorId,

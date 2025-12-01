@@ -68,7 +68,7 @@ SchoolDay's business model is fundamentally different from Clever/ClassLink:
 │  STEP 4: Credential Provisioning                                            │
 │  ──────────────────────────────                                             │
 │  [FORM:CREDENTIALS] displays:                                               │
-│  • API Key: sk_test_xxxxx                                                   │
+│  • API Key: sbox_test_xxxxx                                                 │
 │  • API Secret: (shown once)                                                 │
 │  • Base URL: https://api.schoolday.com/oneroster/v1.2                       │
 │  • Rate Limit: 60 requests/minute                                           │

@@ -204,7 +204,7 @@ describe('handleProvisionSandbox', () => {
 
     const data = result.data as Record<string, unknown>;
     expect(data.new).toBe(true);
-    expect(data.apiKey).toMatch(/^sk_test_/);
+    expect(data.apiKey).toMatch(/^sbox_test_/);
     expect(data.apiSecret).toBeDefined();
     expect(data.baseUrl).toContain('sandbox');
     expect(data.environment).toBe('sandbox');
@@ -683,7 +683,7 @@ describe('handleGetCredentials', () => {
     expect(result.showForm).toBe('credentials');
 
     const data = result.data as Record<string, unknown>;
-    expect(data.apiKey).toMatch(/^sk_test_/);
+    expect(data.apiKey).toMatch(/^sbox_test_/);
     expect(data.apiSecret).toBe('••••••••••••••••');
     expect(data.baseUrl).toBeDefined();
     expect(data.status).toBe('ACTIVE');

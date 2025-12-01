@@ -1,0 +1,233 @@
+// =============================================================================
+// LAUSD Vendor Integration Portal - Prisma Schema
+// =============================================================================
+//
+// Database: SQLite for development, PostgreSQL for production
+// Configured via DATABASE_URL environment variable
+//
+// Usage:
+//   Development: DATABASE_URL="file:./dev.db"
+//   Production:  DATABASE_URL="postgresql://..."
+//
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS (SQLite doesn't support enums, so we use String with validation in code)
+// =============================================================================
+
+// AccessTier: PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
+// PodsStatus: NOT_STARTED | IN_PROGRESS | PENDING_REVIEW | APPROVED | REJECTED | EXPIRED
+// SandboxStatus: PROVISIONING | ACTIVE | EXPIRED | REVOKED
+// IntegrationType: SSO | ONEROSTER | LTI | COMMUNICATION
+// IntegrationStatus: NOT_CONFIGURED | CONFIGURING | TESTING | ACTIVE | ERROR | DISABLED
+// SsoProvider: SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+// CommChannel: EMAIL | SMS | PUSH | IN_APP
+// MessageStatus: QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+
+// =============================================================================
+// VENDOR - Core entity representing an EdTech vendor
+// =============================================================================
+
+model Vendor {
+  id                String   @id @default(uuid())
+  name              String
+  contactEmail      String   @unique
+  contactName       String
+  website           String?
+  description       String?
+
+  // Access & Status
+  accessTier        String   @default("PRIVACY_SAFE") // PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
+  podsStatus        String   @default("NOT_STARTED")  // NOT_STARTED | IN_PROGRESS | PENDING_REVIEW | APPROVED | REJECTED | EXPIRED
+  podsApplicationId String?
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  integrations       IntegrationConfig[]
+  // Note: sandboxCredentials, auditLogs, and messages removed - they reference vendorId without FK constraint
+  // This allows test isolation and prevents FK violations during testing
+
+  @@index([contactEmail])
+  @@index([podsStatus])
+  @@index([accessTier])
+}
+
+// =============================================================================
+// PODS APPLICATION - PoDS-Lite application records
+// =============================================================================
+
+model PodsApplication {
+  id              String    @id
+  vendorName      String
+  applicationName String
+  contactEmail    String
+
+  // Status
+  status          String    @default("PENDING_REVIEW") // NOT_STARTED | IN_PROGRESS | PENDING_REVIEW | APPROVED | REJECTED | EXPIRED
+  accessTier      String    @default("PRIVACY_SAFE")   // PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
+
+  // Timestamps
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  expiresAt       DateTime?
+
+  @@index([vendorName])
+  @@index([contactEmail])
+  @@index([status])
+}
+
+// =============================================================================
+// SANDBOX CREDENTIALS - API credentials for OneRoster access
+// =============================================================================
+
+model SandboxCredentials {
+  id                 String    @id @default(uuid())
+  vendorId           String    @unique
+
+  // Credentials
+  apiKey             String    @unique
+  apiSecret          String
+  baseUrl            String
+
+  // Configuration
+  environment        String    @default("sandbox") // sandbox | production
+  status             String    @default("ACTIVE")  // PROVISIONING | ACTIVE | EXPIRED | REVOKED
+  rateLimitPerMinute Int       @default(60)
+  allowedEndpoints   String    // JSON array stored as string (SQLite limitation)
+
+  // Timestamps
+  expiresAt          DateTime
+  createdAt          DateTime  @default(now())
+  lastUsedAt         DateTime?
+
+  // Note: No FK constraint - allows test isolation and prevents FK violations during testing
+
+  @@index([apiKey])
+  @@index([vendorId])
+  @@index([status])
+}
+
+// =============================================================================
+// INTEGRATION CONFIG - SSO, LTI, OneRoster configurations
+// =============================================================================
+
+model IntegrationConfig {
+  id                String    @id @default(uuid())
+  vendorId          String
+
+  // Type & Status
+  type              String    // SSO | ONEROSTER | LTI | COMMUNICATION
+  status            String    @default("NOT_CONFIGURED") // NOT_CONFIGURED | CONFIGURING | TESTING | ACTIVE | ERROR | DISABLED
+
+  // SSO-specific fields
+  ssoProvider       String?   // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+  ssoClientId       String?
+  ssoClientSecret   String?
+  ssoRedirectUri    String?
+
+  // OneRoster-specific fields
+  oneRosterVersion  String?   // 1.1 | 1.2
+  oneRosterBaseUrl  String?
+
+  // LTI-specific fields
+  ltiVersion        String?   // 1.3
+  ltiClientId       String?
+  ltiDeploymentId   String?
+  ltiJwksUrl        String?
+  ltiAuthUrl        String?
+  ltiTokenUrl       String?
+  ltiLaunchUrl      String?
+
+  // Test results
+  configuredAt      DateTime?
+  lastTestedAt      DateTime?
+  testResult        String?   // PASS | FAIL | PENDING
+  errorMessage      String?
+
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([type])
+  @@index([status])
+}
+
+// =============================================================================
+// AUDIT LOG - Comprehensive audit trail
+// =============================================================================
+
+model AuditLog {
+  id            String    @id @default(uuid())
+  vendorId      String    // Note: No FK constraint - audit logs can reference non-existent vendors
+
+  // Event details
+  action        String    // e.g., VENDOR_CREATED, SANDBOX_CREATED, SSO_CONFIGURED
+  resourceType  String    // vendor | sandbox | sso | pods_application | etc.
+  resourceId    String?
+  details       String?   // JSON stored as string (SQLite limitation)
+
+  // Request metadata
+  ipAddress     String?
+  userAgent     String?
+
+  // Timestamp
+  timestamp     DateTime  @default(now())
+
+  // Note: Removed vendor relation to allow audit logs without strict FK constraint
+  // This enables logging events before/during vendor creation and system-level events
+
+  @@index([vendorId])
+  @@index([action])
+  @@index([timestamp])
+  @@index([resourceType])
+}
+
+// =============================================================================
+// COMMUNICATION MESSAGE - Test messages via CPaaS
+// =============================================================================
+
+model CommunicationMessage {
+  id              String    @id @default(uuid())
+  vendorId        String
+
+  // Channel & Status
+  channel         String    // EMAIL | SMS | PUSH | IN_APP
+  status          String    @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+
+  // Recipient (tokenized)
+  recipientToken  String    // e.g., TKN_STU_8X9Y2Z or TKN_PAR_xxx
+  recipientType   String    // STUDENT | TEACHER | PARENT
+
+  // Content
+  subject         String?   // For email
+  body            String
+
+  // Delivery tracking
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  failureReason   String?
+
+  // Timestamp
+  createdAt       DateTime  @default(now())
+
+  // Note: No FK constraint - allows test isolation and prevents FK violations during testing
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([channel])
+}

@@ -81,7 +81,7 @@ export const mockSchools = [
 ];
 
 export const mockCredentials = {
-  apiKey: "sk_test_abc123xyz789",
+  apiKey: "sbox_test_abc123xyz789",
   apiSecret: "secret_xyz789abc123",
   sandboxUrl: "https://sandbox.schoolday.lausd.net/api/v1",
   onerosterBaseUrl: "https://sandbox.schoolday.lausd.net/oneroster/v1p2",

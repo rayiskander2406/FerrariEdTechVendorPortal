@@ -103,7 +103,7 @@ This significantly improves user experience by pre-filling the form. ALWAYS extr
 
 Prerequisites:
 - Vendor must have an APPROVED PoDS status
-- Creates API key (sk_test_xxx) and secret
+- Creates API key (sbox_test_xxx) and secret
 - Credentials valid for 90 days
 
 Use this tool when:
@@ -455,7 +455,7 @@ Returns timestamped list of actions with details.`,
     description: `Retrieve and display the sandbox credentials for a vendor.
 
 Returns:
-- API Key (sk_test_xxx format)
+- API Key (sbox_test_xxx format)
 - API Secret (displayed securely)
 - Base URL for API calls
 - Expiration date

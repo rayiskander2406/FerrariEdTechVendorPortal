@@ -82,7 +82,7 @@ function createMockCredentials(overrides: Partial<SandboxCredentials> = {}): San
   return {
     id: "cred-123-456-789",
     vendorId: "vendor-abc-def",
-    apiKey: "sk_test_abc123def456",
+    apiKey: "sbox_test_abc123def456",
     apiSecret: "secret_xyz789abc123def456ghi789",
     baseUrl: "https://sandbox.schoolday.lausd.net/api/v1",
     environment: "sandbox",
