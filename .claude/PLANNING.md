@@ -1052,6 +1052,230 @@ All sandboxes share these v1.0 components:
 
 ---
 
+## Strategic Initiative: District Admin Portal
+
+> **Dependency**: Requires v1.0 data layer (PostgreSQL, authentication) to be complete
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║     DISTRICT ADMIN PORTAL                                                ║
+║     "Self-Service District Configuration & Vendor Governance"            ║
+║     Status: 📋 SCOPED - Pending Management Review                        ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  WHY THIS MATTERS                                                        ║
+║  ─────────────────                                                       ║
+║  • Districts can't onboard vendors without configuring their environment ║
+║  • LAUSD alone has 1,000+ schools - manual setup is not scalable         ║
+║  • Vendor governance (credit scores, policies) is a key differentiator   ║
+║  • Self-service reduces SchoolDay support burden                         ║
+║                                                                          ║
+║  CURRENT STATE: Vendor Portal only. No district-side configuration.      ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  5 CORE MODULES                                                          ║
+║  ──────────────                                                          ║
+║                                                                          ║
+║  MODULE 1: DISTRICT SETUP WIZARD                                         ║
+║  ├── Basic info (name, domain, NCES ID, student count)                   ║
+║  ├── Schools management (CRUD, grade ranges, enrollment)                 ║
+║  ├── Organizational hierarchy (district → local districts → schools)     ║
+║  ├── SIS connection (PowerSchool, Infinite Campus, Skyward, Aeries)      ║
+║  └── District staff SSO (separate from vendor SSO)                       ║
+║                                                                          ║
+║  MODULE 2: VENDOR GOVERNANCE                                             ║
+║  ├── Minimum credit score thresholds per access tier                     ║
+║  │   • Privacy-Safe: Score ≥ 40 (configurable)                           ║
+║  │   • Selective: Score ≥ 60 + manual review                             ║
+║  │   • Full Access: Score ≥ 80 + board approval                          ║
+║  ├── Custom approval workflows (single approver → multi-level)           ║
+║  ├── Vendor allow/block lists                                            ║
+║  ├── Category restrictions (e.g., "no social media apps")                ║
+║  └── Contract/DPA template management                                    ║
+║                                                                          ║
+║  MODULE 3: COMMUNICATION POLICIES                                        ║
+║  ├── Time-of-day restrictions (e.g., "no messages before 7am")           ║
+║  ├── Message frequency limits per vendor                                 ║
+║  ├── Content filtering rules (prohibited words, PII detection)           ║
+║  ├── Channel permissions (email only, SMS allowed, push allowed)         ║
+║  └── Parent opt-out management                                           ║
+║                                                                          ║
+║  MODULE 4: DATA POLICIES                                                 ║
+║  ├── Field-level access control per tier                                 ║
+║  ├── Data retention requirements (30 days, 1 year, etc.)                 ║
+║  ├── Export/deletion request handling                                    ║
+║  ├── Tokenization settings (which fields to tokenize)                    ║
+║  └── Sync frequency configuration                                        ║
+║                                                                          ║
+║  MODULE 5: ANALYTICS & COMPLIANCE                                        ║
+║  ├── Vendor usage dashboards (API calls, messages sent)                  ║
+║  ├── Compliance reports (FERPA, COPPA, SOPIPA)                           ║
+║  ├── Audit log access with search/filter                                 ║
+║  ├── Anomaly alerts (unusual access patterns)                            ║
+║  └── Annual review reminders                                             ║
+║                                                                          ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  LAUSD-SPECIFIC REQUIREMENTS                                             ║
+║  ────────────────────────────                                            ║
+║  • 1,000+ schools across 8 Local Districts                               ║
+║  • 670,000 students, 75,000 employees                                    ║
+║  • Existing systems: Schoology (LMS), MiSiS (SIS), Google Workspace      ║
+║  • Nested hierarchy: LAUSD → Local District → School → Department        ║
+║  • Board approval required for Full Access tier                          ║
+║                                                                          ║
+║  ESTIMATED EFFORT: 10-12 weeks                                           ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+### District Admin Portal: Key Decisions Required
+
+| # | Decision | Options | Considerations | Owner |
+|---|----------|---------|----------------|-------|
+| DAP-D1 | **Start with LAUSD-specific or generic?** | A) LAUSD-first, generalize later B) Generic from start C) Configurable multi-tenant | LAUSD is the pilot; (A) faster to market, (B) more scalable | TBD |
+| DAP-D2 | **Credit score enforcement** | A) Hard block B) Soft warning + override C) Configurable per district | Recommend (C) - districts have different risk tolerances | TBD |
+| DAP-D3 | **School data source** | A) Manual entry B) SIS sync C) NCES database import D) All of above | (D) provides flexibility; NCES gives baseline | TBD |
+| DAP-D4 | **Approval workflow complexity** | A) Single approver B) Role-based (IT → Privacy → Legal) C) Fully customizable | LAUSD needs (B) minimum; (C) is over-engineering risk | TBD |
+| DAP-D5 | **Multi-tenant architecture** | A) Single DB, district isolation B) DB-per-district C) Hybrid | (A) simpler; (B) better for enterprise sales | TBD |
+| DAP-D6 | **Admin portal tech stack** | A) Same as vendor portal (Next.js) B) Separate admin app C) Embedded in vendor portal | (A) code reuse; (B) cleaner separation | TBD |
+| DAP-D7 | **SIS integration depth** | A) Manual CSV upload B) Scheduled sync C) Real-time webhooks D) All tiers | Start with (A+B), add (C) for premium | TBD |
+| DAP-D8 | **Sub-admin roles** | A) District-wide admins only B) School-level admins C) Department-level | LAUSD Local Districts need (B) minimum | TBD |
+
+### District Admin Portal: Implementation Phases
+
+| Phase | Focus | Deliverables | Effort | Dependencies |
+|-------|-------|--------------|--------|--------------|
+| **Phase 0: Decision** | Resolve DAP-D1 through DAP-D8 | Decision document signed off | 1 week | Management review |
+| **Phase 1: District Setup** | Basic config + schools | Wizard, school CRUD, basic info | 2 weeks | v1.0 data layer |
+| **Phase 2: SIS Integration** | Connect to student data | PowerSchool, IC, Skyward adapters | 2 weeks | Phase 1 |
+| **Phase 3: Vendor Governance** | Credit scores + approvals | Score thresholds, approval workflows | 2 weeks | EdTech Credit Bureau |
+| **Phase 4: Policies** | Communication + data rules | Policy configuration UI, enforcement | 2 weeks | Phase 3 |
+| **Phase 5: Analytics** | Dashboards + compliance | Usage reports, audit access | 2 weeks | Phase 4 |
+| **Phase 6: Polish** | LAUSD pilot feedback | Bug fixes, UX refinements | 2 weeks | LAUSD testing |
+
+**Total Estimated Effort**: 10-12 weeks
+
+### District Admin Portal: GO/NO-GO Gates
+
+| Gate | Criteria | Status |
+|------|----------|--------|
+| **DECISION** | All DAP-D* decisions documented and approved | 📋 Pending |
+| **SCHOOLS** | LAUSD can import/manage 1,000+ schools | 📋 Pending |
+| **SIS** | At least one SIS integration working (PowerSchool or IC) | 📋 Pending |
+| **GOVERNANCE** | Credit score thresholds configurable and enforced | 📋 Pending |
+| **POLICIES** | Communication time restrictions working | 📋 Pending |
+| **SCALE** | System handles LAUSD scale (670K students) | 📋 Pending |
+| **SECURITY** | Role-based access control verified | 📋 Pending |
+
+### District Admin Portal: Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Scope creep (every district wants custom features) | High | High | Start with LAUSD, say "no" to others until v2 |
+| SIS integration complexity | High | Medium | Start with CSV upload, add live sync later |
+| LAUSD organizational complexity | Medium | High | Involve LAUSD IT early; build for nested hierarchy |
+| Performance at scale (1000 schools) | Medium | High | Pagination, caching, lazy loading from day 1 |
+| Approval workflow edge cases | Medium | Medium | Keep workflows simple; avoid Turing-complete rules |
+| Security (district admins have broad access) | Medium | Critical | Audit logging, principle of least privilege |
+
+### District Admin Portal: Data Model Sketch
+
+```typescript
+interface District {
+  id: string;
+  name: string;                    // "Los Angeles Unified School District"
+  slug: string;                    // "lausd"
+  ncesId: string;                  // National Center for Education Statistics ID
+  domain: string;                  // "lausd.net"
+  studentCount: number;
+  employeeCount: number;
+
+  // Hierarchy
+  localDistricts?: LocalDistrict[];  // For large districts like LAUSD
+  schools: School[];
+
+  // Integrations
+  sisType: 'powerschool' | 'infinite_campus' | 'skyward' | 'aeries' | 'other';
+  sisConfig: SISConfig;
+  lmsType: 'schoology' | 'canvas' | 'google_classroom' | 'other';
+  idpType: 'google' | 'azure_ad' | 'clever' | 'classlink' | 'other';
+
+  // Governance
+  vendorPolicies: VendorPolicies;
+  communicationPolicies: CommPolicies;
+  dataPolicies: DataPolicies;
+
+  // Admin
+  admins: DistrictAdmin[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface VendorPolicies {
+  minCreditScore: {
+    privacySafe: number;           // e.g., 40
+    selective: number;             // e.g., 60
+    fullAccess: number;            // e.g., 80
+  };
+  requireManualReview: {
+    selective: boolean;            // true
+    fullAccess: boolean;           // true
+  };
+  blockedCategories: string[];     // ["social_media", "gaming"]
+  blockedVendors: string[];        // Vendor IDs
+  allowedVendors: string[];        // Whitelist (if set, only these allowed)
+  approvalWorkflow: ApprovalWorkflow;
+}
+
+interface CommPolicies {
+  allowedChannels: ('email' | 'sms' | 'push')[];
+  quietHours: { start: string; end: string };  // "22:00" - "07:00"
+  maxMessagesPerVendorPerDay: number;
+  contentFilters: ContentFilter[];
+  requireParentOptIn: boolean;
+}
+
+interface School {
+  id: string;
+  districtId: string;
+  localDistrictId?: string;
+  name: string;
+  ncesId: string;
+  gradeRange: { low: string; high: string };  // "K" - "5", "6" - "8", "9" - "12"
+  studentCount: number;
+  address: Address;
+  principal?: string;
+  active: boolean;
+}
+```
+
+### District Admin Portal: Open Questions for Management
+
+1. **Priority relative to Vendor Portal UX Redesign?** Both are significant efforts. Can they run in parallel with separate teams?
+
+2. **LAUSD as design partner?** Should we formally engage LAUSD IT as co-designers with early access and feedback loops?
+
+3. **Pricing model?** Is District Admin Portal:
+   - A) Free (districts are the customer, vendors pay via CPaaS)
+   - B) Freemium (basic free, advanced governance features paid)
+   - C) Enterprise sales (custom pricing per district)
+
+4. **Build vs. buy for SIS integration?** Should we use existing SIS middleware (e.g., Clever, ClassLink) initially and build native later?
+
+5. **Compliance certifications?** Do we need SOC 2 Type II before enterprise districts will adopt?
+
+6. **Who is the buyer?** Is this sold to:
+   - A) District CTO/CIO
+   - B) Privacy Officer
+   - C) Superintendent
+   - D) School Board
+
+---
+
 ## Strategic Vision
 
 ```
@@ -2058,6 +2282,7 @@ Leaves buffer for go-to-market, sales, support
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | Dec 1 | **UX Redesign Initiative Scoped** | Chat-first UI is great for demos but suboptimal for daily vendor use. Scoped dashboard-first approach with AI augmentation at 6 specific touchpoints (error diagnosis, response explanation, upgrade help, message drafting, onboarding, config validation). Created prototypes: `portal-reimagined.html` (full dashboard) and `pitch-presentation.html` (exec slides). 7 key decisions (UX-D1 to UX-D7) documented for management review. Estimated 10 weeks effort, can run parallel to v1.0 backend. Key insight: "Chat is the guide, not the destination." |
+| Dec 1 | **District Admin Portal Initiative Scoped** | Identified gap in planning: no mechanism for district IT to configure their vendor ecosystem. Scoped 5 core modules: District Setup Wizard (SSO/SIS/LMS integration), Vendor Governance (credit score thresholds, approval workflows), Communication Policies (channel restrictions, rate limits), Data Policies (default privacy tiers, field blocking), Analytics & Compliance (dashboards, FERPA reports). 8 key decisions (DAP-D1 to DAP-D8) documented. Estimated 10-12 weeks. Critical insight: district-level config enables per-district defaults that simplify individual vendor onboarding. Multi-tenant architecture required. |
 | Nov 30 | **MVP Complete: 10/10 tasks, 1070 tests** | MVP-06 CPaaS demo polish completed with 205 new tests. Created lib/config/cpaas.ts SSOT (pricing, channels, delivery status, LAUSD scale constants). CommTestForm now includes: cost preview section, delivery status simulation (QUEUED→SENT→DELIVERED), privacy explainer panel with FERPA/COPPA badges, scale calculator showing LAUSD-wide costs. Following DEVELOPMENT_PATTERNS.md: centralized config first, then consistency tests, then implementation. Total MVP: 1070 tests, zero bugs in production. |
 | Nov 30 | **CPaaS Provider Stack: Vonage + Sinch** | Updated CPAAS_DEVSPIKE.md from SendGrid/Twilio references to actual providers (Vonage/Sinch). Multi-provider strategy enables: rate negotiation leverage, hedging against single provider dependency, failover for reliability. Added V1-14 (provider abstraction) and V1-15 (margin tracking) to v1.0 backlog as P3 tasks. Demo (MVP-06) abstracts this - vendors see "SchoolDay Secure Network" not provider details. |
 | Nov 30 | **MVP-05 Form Triggers Complete** | 103 tests verifying form trigger system: detection from [FORM:*] markers, tool result showForm handling, all 8 forms render correctly, cross-layer consistency (handlers → useChat → page). Total: 865 tests passing. MVP now 9/10 complete. |
