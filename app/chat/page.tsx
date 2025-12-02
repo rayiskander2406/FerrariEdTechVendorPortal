@@ -357,6 +357,7 @@ export default function ChatPage() {
   // HELPER: Add system message to chat
   // ==========================================================================
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const addSystemMessage = useCallback((_content: string) => {
     // This is a workaround since we can't directly add messages
     // In production, this would be handled by the useChat hook

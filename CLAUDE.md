@@ -15,6 +15,96 @@ This is the **LAUSD Vendor Self-Service Integration Portal** - an AI-powered pla
 - **Database**: PostgreSQL with Prisma ORM (mock mode available)
 - **Runtime**: Node.js 18+
 
+---
+
+## Critical: Specification-Driven Development
+
+**This project uses specification-driven development. The file `spec/vendor-portal-rules.yaml` is the SINGLE SOURCE OF TRUTH for:**
+
+- Privacy tier authorization rules
+- Token formats (TKN_STU_, TKN_TCH_, etc.)
+- State machine transitions (sync_status, circuit_breaker, etc.)
+- Data integrity invariants
+
+### Before Making Privacy/Tokenization Changes
+
+1. **ALWAYS update `spec/vendor-portal-rules.yaml` FIRST**
+2. **THEN regenerate tests:** `npm run generate:spec`
+3. **THEN implement the change** in the codebase
+4. **THEN verify:** `npm run test:generated`
+
+### Files That Are Auto-Generated (DO NOT EDIT MANUALLY)
+
+- `tests/generated/*.generated.test.ts` - Generated from spec
+- `docs/generated/spec.md` - Generated from spec
+
+### Key Commands
+
+```bash
+npm run generate:spec    # Regenerate tests from spec
+npm run test:generated   # Run generated tests only (65 tests)
+npm run verify:spec      # Ensure spec is in sync
+```
+
+### Formal Invariants
+
+| Invariant | Severity | Description |
+|-----------|----------|-------------|
+| `injectivity` | critical | Different users → different tokens |
+| `access_tier_enforcement` | critical | Vendor tier ≥ data tier required |
+| `grade_bounds` | high | scoreGiven ≤ scoreMaximum |
+| `parent_child_roles` | critical | Relationships have correct roles |
+
+### Token Utilities Module (`lib/tokens/index.ts`)
+
+Exportable, pure, deterministic token generation functions:
+
+```typescript
+import {
+  studentToken,      // TKN_STU_{8char} - studentToken(schoolId, index)
+  teacherToken,      // TKN_TCH_{8char} - teacherToken(schoolId, index)
+  parentToken,       // TKN_PAR_{8char} - parentToken(studentToken, index)
+  tokenizedEmail,    // TKN_STU_xxx@relay.schoolday.lausd.net
+  tokenizedPhone,    // TKN_555_xxx_xxxx
+  parseToken,        // Parse token into {type, hash, original}
+  isValidToken,      // Validate token format
+  registerToken,     // Register token → value mapping
+  detokenize,        // Lookup original value from token
+  TOKEN_PATTERNS,    // Regex patterns for validation
+} from '@/lib/tokens';
+
+// Example usage
+const token = studentToken('lincoln-high', 42);  // TKN_STU_A1B2C3D4
+const email = tokenizedEmail(token);              // TKN_STU_a1b2c3d4@relay.schoolday.lausd.net
+```
+
+### CI/CD Integration
+
+The project includes GitHub Actions workflow (`.github/workflows/spec-verification.yml`):
+
+1. **verify-spec job**: Regenerates from spec, fails if drift detected
+2. **run-generated-tests job**: Runs all 65 property-based tests
+3. **axiom-validation job**: Extended validation of formal axioms
+
+Runs on all PRs touching `spec/`, `lib/tokens/`, or `tests/generated/`.
+
+### Pre-Commit Hook Setup
+
+Prevent committing when spec and tests are out of sync:
+
+```bash
+# Option 1: Manual installation
+cp scripts/pre-commit-spec-check.sh .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+
+# Option 2: Using Husky (recommended)
+npm install -D husky
+npx husky init
+echo "npm run verify:spec" > .husky/pre-commit
+```
+
+---
+
 ## Architecture
 
 ```
@@ -99,6 +189,8 @@ Simplified 13-question privacy application (versus 71 for full PoDS) that auto-a
     index.ts               # Prisma client & helpers
   /data
     synthetic.ts           # LAUSD demo data generator
+  /tokens                  # Token utilities (NEW)
+    index.ts               # Exportable token generation functions
   /schemas                 # Schema-first architecture
     core.ts                # Field metadata, extraction utilities
     index.ts               # Exports
@@ -113,6 +205,19 @@ Simplified 13-question privacy application (versus 71 for full PoDS) that auto-a
     useChat.ts             # Chat state management
   utils.ts
 
+/spec                      # Specification-driven development (NEW)
+  vendor-portal-rules.yaml # THE SINGLE SOURCE OF TRUTH
+  README.md                # Spec documentation
+  /generator
+    index.ts               # Test/doc generator from YAML
+
+/scripts
+  pre-commit-spec-check.sh # Pre-commit hook for spec sync
+
+/.github
+  /workflows
+    spec-verification.yml  # CI for spec verification
+
 /prisma
   schema.prisma
 
@@ -124,6 +229,11 @@ Simplified 13-question privacy application (versus 71 for full PoDS) that auto-a
 
 /tests
   scenarios.ts             # Demo scenario validation
+  /generated               # Auto-generated from spec (DO NOT EDIT)
+    token.generated.test.ts          # 26 token format/axiom tests
+    state-machine.generated.test.ts  # 25 state transition tests
+    invariant.generated.test.ts      # 7 data integrity tests
+    privacy-tier.generated.test.ts   # 7 authorization tests
 ```
 
 ## AI Tools (12 total)
@@ -172,8 +282,13 @@ npx prisma generate
 # Run database migrations
 npx prisma migrate dev
 
-# Run tests
+# Run all tests
 npm test
+
+# Specification-driven development commands
+npm run generate:spec    # Regenerate tests from spec YAML
+npm run test:generated   # Run only generated tests (65 tests)
+npm run verify:spec      # Ensure spec and tests are in sync
 
 # Build for production
 npm run build
@@ -299,11 +414,25 @@ const mockData = factory.create({ seed: 12345 });
 
 ### Test Categories
 
+- **Generated property-based tests** (65 tests): Auto-generated from `spec/vendor-portal-rules.yaml`
+  - Token format preservation tests
+  - Injectivity (no collision) tests
+  - Roundtrip (tokenize → detokenize) tests
+  - State machine transition tests
+  - Privacy tier authorization tests
 - Unit tests for tool handlers and utilities
 - Integration tests for API routes
 - Scenario tests for demo flows
 - Manual testing for chat UX
 - **Cross-layer consistency tests**: Verify backend and UI share same configuration (see `tests/config/` for examples)
+
+### Running Tests
+
+```bash
+npm test                 # Run all tests
+npm run test:generated   # Run only spec-generated tests (65 tests)
+npm run verify:spec      # Verify spec is in sync with generated tests
+```
 
 ## Demo Requirements
 
@@ -326,6 +455,11 @@ The portal must handle improvised questions from LAUSD IT administrators coverin
 5. **LAUSD Context**: AI must know LAUSD-specific details (670K students, Schoology LMS, etc.)
 
 ## Related Documentation
+
+### Specification-Driven Development
+- [Spec README](./spec/README.md) - **START HERE for spec-driven development** - Token utilities, CI setup, pre-commit hooks
+- [Generated Spec Docs](./docs/generated/spec.md) - Auto-generated formal specification (privacy tiers, state machines, axioms)
+- [YAML Specification](./spec/vendor-portal-rules.yaml) - THE SINGLE SOURCE OF TRUTH
 
 ### Development Guides
 - [Development Patterns](./.claude/DEVELOPMENT_PATTERNS.md) - **START HERE for new features** - Codified patterns for zero-bug development

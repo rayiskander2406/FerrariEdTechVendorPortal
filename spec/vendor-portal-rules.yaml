@@ -1,0 +1,361 @@
+# =============================================================================
+# LAUSD Vendor Portal - Formal Specification
+# =============================================================================
+#
+# This is the SINGLE SOURCE OF TRUTH for:
+#   - Privacy tier authorization rules
+#   - Tokenization formats and constraints
+#   - State machine transitions
+#   - Data integrity invariants
+#
+# To regenerate tests and docs:
+#   npm run generate:spec
+#
+# =============================================================================
+
+version: "1.0"
+name: "LAUSD Vendor Portal"
+description: "Privacy-first EdTech vendor integration platform"
+
+# =============================================================================
+# FORMAL AXIOMS
+# =============================================================================
+# These properties MUST hold. Violations are critical bugs.
+
+axioms:
+  injectivity:
+    description: "Different users produce different tokens (no collisions)"
+    formal: "∀ u1, u2 ∈ Users: u1 ≠ u2 → token(u1) ≠ token(u2)"
+    severity: critical
+
+  roundtrip:
+    description: "Tokenize then detokenize returns original value"
+    formal: "∀ u ∈ Users: detokenize(tokenize(u)) = u"
+    severity: critical
+
+  format_preservation:
+    description: "Token maintains expected format for its type"
+    formal: "∀ u ∈ Users: format(token(u)) ∈ valid_formats(role(u))"
+    severity: high
+
+  access_tier_enforcement:
+    description: "Vendor can only access data matching their approved tier"
+    formal: "∀ vendor, data: access(vendor, data) → tier(vendor) ≥ tier_required(data)"
+    severity: critical
+
+  state_machine_validity:
+    description: "State transitions follow defined paths only"
+    formal: "∀ entity, s1, s2: transition(entity, s1, s2) → (s1, s2) ∈ valid_transitions"
+    severity: high
+
+# =============================================================================
+# PRIVACY TIERS
+# =============================================================================
+
+privacy_tiers:
+  PRIVACY_SAFE:
+    level: 1
+    description: "Zero PII - instant auto-approval"
+    visible_fields:
+      user: [id, token, role, gradeLevel, primarySchoolId]
+      demographics: []
+    tokenized_fields: [givenName, familyName, email, phone]
+    approval: automatic
+    review_time: "minutes"
+
+  SELECTIVE:
+    level: 2
+    description: "Limited PII - requires review"
+    visible_fields:
+      user: [id, token, role, gradeLevel, primarySchoolId, givenName]
+      demographics: [freeLunchStatus, englishLanguageLearner, specialEducation]
+    tokenized_fields: [familyName, email, phone]
+    approval: manual
+    review_time: "1-2 weeks"
+
+  FULL_ACCESS:
+    level: 3
+    description: "Full PII - extensive review required"
+    visible_fields:
+      user: [id, token, role, gradeLevel, primarySchoolId, givenName, familyName, email, phone]
+      demographics: ["*"]
+    tokenized_fields: []
+    approval: manual
+    review_time: "4-6 weeks"
+
+# =============================================================================
+# TOKEN TYPES
+# =============================================================================
+
+token_types:
+  student:
+    description: "Student user tokens"
+    format: "TKN_STU_{hash:8}"
+    pattern: "^TKN_STU_[A-Z0-9]{8}$"
+    example: "TKN_STU_8X9Y2Z3A"
+    axioms: [injectivity, roundtrip, format_preservation]
+    test_seeds:
+      - "student_001"
+      - "student_999999"
+      - ""
+    edge_cases:
+      - description: "Empty student ID"
+        input: ""
+        expected: "should_reject_or_generate_valid"
+      - description: "Very long student ID"
+        input: "student_with_extremely_long_identifier_12345678901234567890"
+        expected: "should_truncate_hash_correctly"
+
+  teacher:
+    description: "Teacher user tokens"
+    format: "TKN_TCH_{hash:8}"
+    pattern: "^TKN_TCH_[A-Z0-9]{8}$"
+    example: "TKN_TCH_7B8C9D0E"
+    axioms: [injectivity, roundtrip, format_preservation]
+    test_seeds:
+      - "teacher_001"
+      - "teacher_admin"
+
+  parent:
+    description: "Parent user tokens"
+    format: "TKN_PAR_{hash:8}"
+    pattern: "^TKN_PAR_[A-Z0-9]{8}$"
+    example: "TKN_PAR_1F2G3H4I"
+    axioms: [injectivity, roundtrip, format_preservation]
+
+  email:
+    description: "Tokenized email addresses"
+    format: "TKN_STU_{hash:8}@relay.schoolday.lausd.net"
+    pattern: "^TKN_STU_[A-Z0-9]{8}@relay\\.schoolday\\.lausd\\.net$"
+    example: "TKN_STU_8X9Y2Z3A@relay.schoolday.lausd.net"
+    axioms: [injectivity, format_preservation]
+    preserves: "domain structure"
+
+  phone:
+    description: "Tokenized phone numbers"
+    format: "TKN_555_{hash:3}_{hash:4}"
+    pattern: "^TKN_555_[0-9]{3}_[0-9]{4}$"
+    example: "TKN_555_123_4567"
+    axioms: [format_preservation]
+    preserves: "phone number structure"
+
+# =============================================================================
+# STATE MACHINES
+# =============================================================================
+
+state_machines:
+  sync_status:
+    description: "Data synchronization lifecycle"
+    initial: pending
+    states:
+      - pending
+      - syncing
+      - synced
+      - conflict
+      - error
+    transitions:
+      - from: pending
+        to: syncing
+        trigger: sync_started
+      - from: syncing
+        to: synced
+        trigger: sync_completed
+      - from: syncing
+        to: conflict
+        trigger: conflict_detected
+      - from: syncing
+        to: error
+        trigger: sync_failed
+      - from: conflict
+        to: pending
+        trigger: conflict_resolved
+      - from: error
+        to: pending
+        trigger: retry_requested
+    entities: [User, School, Class, Enrollment, Course, AcademicSession, Demographics]
+
+  circuit_breaker:
+    description: "External service resilience"
+    initial: closed
+    states:
+      - closed
+      - open
+      - half_open
+    transitions:
+      - from: closed
+        to: open
+        trigger: failure_threshold_exceeded
+      - from: open
+        to: half_open
+        trigger: timeout_elapsed
+      - from: half_open
+        to: closed
+        trigger: success_threshold_met
+      - from: half_open
+        to: open
+        trigger: probe_failed
+    entities: [ExternalServiceHealth]
+
+  vendor_grant_status:
+    description: "Vendor data access grant lifecycle"
+    initial: pending_review
+    states:
+      - pending_review
+      - approved
+      - rejected
+      - expired
+      - revoked
+    transitions:
+      - from: pending_review
+        to: approved
+        trigger: review_approved
+      - from: pending_review
+        to: rejected
+        trigger: review_rejected
+      - from: approved
+        to: expired
+        trigger: expiry_date_reached
+      - from: approved
+        to: revoked
+        trigger: manual_revocation
+    entities: [VendorDataGrant]
+
+  enrollment_status:
+    description: "Student enrollment lifecycle"
+    initial: active
+    states:
+      - active
+      - completed
+      - withdrawn
+      - transferred
+    transitions:
+      - from: active
+        to: completed
+        trigger: course_completed
+      - from: active
+        to: withdrawn
+        trigger: student_withdrawn
+      - from: active
+        to: transferred
+        trigger: student_transferred
+    entities: [Enrollment]
+
+# =============================================================================
+# DATA INTEGRITY INVARIANTS
+# =============================================================================
+
+invariants:
+  grade_bounds:
+    description: "Score given cannot exceed score maximum"
+    formal: "∀ grade: grade.scoreGiven ≤ grade.scoreMaximum"
+    entities: [LtiGrade]
+    severity: high
+    test_strategy: property
+
+  effective_dating:
+    description: "End date must be after start date when present"
+    formal: "∀ e: e.effectiveEnd != null → e.effectiveEnd > e.effectiveStart"
+    entities: [Enrollment, AcademicSession]
+    severity: medium
+    test_strategy: property
+
+  parent_child_roles:
+    description: "Parent-child relationships have correct role assignments"
+    formal: "∀ r: r.parent.role = 'parent' ∧ r.child.role = 'student'"
+    entities: [UserRelationship]
+    severity: critical
+    test_strategy: unit
+
+  unique_enrollment:
+    description: "User cannot have duplicate active enrollments in same class"
+    formal: "∀ u, c: |{e: e.user=u ∧ e.class=c ∧ e.status='active'}| ≤ 1"
+    entities: [Enrollment]
+    severity: high
+    test_strategy: property
+
+  vendor_grant_scope:
+    description: "Vendor school grants must be subset of district grant"
+    formal: "∀ sg: sg.school.district = sg.vendorGrant.district"
+    entities: [VendorSchoolGrant, VendorDataGrant]
+    severity: critical
+    test_strategy: unit
+
+  session_expiry:
+    description: "SSO sessions must have future expiry at creation"
+    formal: "∀ s: s.createdAt < s.expiresAt"
+    entities: [SsoSession]
+    severity: high
+    test_strategy: property
+
+  soft_delete_cascade:
+    description: "Soft deleted parent implies soft deleted children"
+    formal: "∀ parent, child: parent.deletedAt != null → child.deletedAt != null"
+    entities: [District, School, User]
+    severity: medium
+    test_strategy: integration
+
+# =============================================================================
+# COMPLIANCE MAPPING
+# =============================================================================
+
+compliance:
+  FERPA:
+    description: "Family Educational Rights and Privacy Act"
+    requirements:
+      - id: ferpa_consent
+        description: "Parental consent required for PII disclosure"
+        implementation: "VendorDataGrant.accessTier validation"
+      - id: ferpa_audit
+        description: "Audit trail for all PII access"
+        implementation: "AuditLog entity"
+      - id: ferpa_minimum
+        description: "Minimum necessary data principle"
+        implementation: "Privacy tier field restrictions"
+
+  COPPA:
+    description: "Children's Online Privacy Protection Act"
+    requirements:
+      - id: coppa_consent
+        description: "Verifiable parental consent for <13"
+        implementation: "ContactPreference.consentGivenAt"
+      - id: coppa_data_minimization
+        description: "Collect only necessary data"
+        implementation: "PRIVACY_SAFE tier default"
+
+# =============================================================================
+# TEST SEEDS
+# =============================================================================
+
+test_seeds:
+  users:
+    students:
+      - sourcedId: "stu_001"
+        givenName: "Alice"
+        familyName: "Johnson"
+        role: "student"
+        gradeLevel: "5"
+      - sourcedId: "stu_002"
+        givenName: "Bob"
+        familyName: "Smith"
+        role: "student"
+        gradeLevel: "K"
+    teachers:
+      - sourcedId: "tch_001"
+        givenName: "Carol"
+        familyName: "Williams"
+        role: "teacher"
+    edge_cases:
+      - sourcedId: ""
+        description: "Empty sourcedId"
+      - sourcedId: "a"
+        description: "Single character"
+      - sourcedId: "stu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        description: "Very long sourcedId"
+
+  vendors:
+    - name: "Math Learning App"
+      accessTier: "PRIVACY_SAFE"
+    - name: "Assessment Platform"
+      accessTier: "SELECTIVE"
+    - name: "Student Information System"
+      accessTier: "FULL_ACCESS"

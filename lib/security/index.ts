@@ -299,11 +299,11 @@ function startCleanup(): void {
   if (cleanupInterval) return;
   cleanupInterval = setInterval(() => {
     const now = Date.now();
-    for (const [key, value] of rateLimitStore.entries()) {
+    rateLimitStore.forEach((value, key) => {
       if (value.resetAt < now) {
         rateLimitStore.delete(key);
       }
-    }
+    });
   }, 60 * 1000); // Cleanup every minute
 }
 
@@ -315,7 +315,8 @@ export function getClientId(request: NextRequest): string {
   // Try to get real IP from headers (for proxied requests)
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    return forwarded.split(",")[0].trim();
+    const firstIp = forwarded.split(",")[0];
+    return firstIp ? firstIp.trim() : "anonymous";
   }
 
   const realIp = request.headers.get("x-real-ip");

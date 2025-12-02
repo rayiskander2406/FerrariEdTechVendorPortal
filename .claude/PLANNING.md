@@ -2642,6 +2642,52 @@ Leaves buffer for go-to-market, sales, support
 | Nov 28 | Free Privacy-Safe tier | Disrupt Clever's vendor-pays model |
 | Nov 28 | 18-month disruption target | Aggressive but achievable with focus |
 | Nov 28 | Open standards for SSO | SAML/OIDC are industry standards; avoid Clever-style proprietary lock-in |
+| Dec 2 | **LAUSD Video Pitch v1.0 Initiated** | 90-second explainer video for Superintendent. MVP complete (script, storyboard, TTS voiceover, Remotion animations). v1.0 refinements: fix pronunciation (EdTech→EdTek, LAUSD→L.A.U.S.D.), 1.5X audio speed, add tokenized communication value prop, add integration breadth (SSO/LTI/Rostering). 7 tasks (VP-01 to VP-07), ~2 hours total. See `video-pitch/VIDEO_PITCH_PLAN.md`. |
+
+---
+
+## Strategic Initiatives: LAUSD Video Pitch
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    LAUSD VIDEO PITCH v1.0                                ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  GOAL: 90-second explainer video for LAUSD Superintendent                ║
+║  PURPOSE: Highlight SchoolDay value props, demand vendor discounts       ║
+║  STATUS: 🚧 v1.0 refinement in progress                                  ║
+║                                                                          ║
+║  KEY VALUE PROPOSITIONS:                                                 ║
+║  • Speed: 13 questions, 2 minutes → instant approval (vs weeks)          ║
+║  • Security: Tokenization = zero PII exposure                            ║
+║  • Compliance: FERPA/COPPA/CA Ed Code built-in, full audit trails        ║
+║  • Cost: No Clever fees ($16-19/school/month saved)                      ║
+║  • Communication: Tokenized relay for email/SMS (NEW in v1.0)            ║
+║  • Integration: SSO + Rostering + LTI + API (NEW in v1.0)                ║
+║  • Leverage: Demand significant vendor discounts                         ║
+║                                                                          ║
+║  TECH STACK:                                                             ║
+║  • Voiceover: Coqui TTS (open-source, local)                             ║
+║  • Video: Remotion (React-based motion graphics)                         ║
+║  • Audio: FFmpeg for 1.5X speed                                          ║
+║                                                                          ║
+║  FILES:                                                                  ║
+║  📂 video-pitch/VIDEO_PITCH_PLAN.md    # Full project plan               ║
+║  📂 video-pitch/SCRIPT.md              # Phonetic script                 ║
+║  📂 video-pitch/STORYBOARD.md          # Visual directions               ║
+║  📂 video-pitch/schoolday-pitch/       # Remotion project                ║
+║                                                                          ║
+║  v1.0 TASKS (7 items, ~2 hours):                                         ║
+║  📋 VP-01: Fix pronunciation (EdTech→EdTek, LAUSD→L.A.U.S.D.)            ║
+║  📋 VP-02: Speed up voiceover to 1.5X                                    ║
+║  📋 VP-03: Add tokenized communication value prop                        ║
+║  📋 VP-04: Add integration breadth value prop                            ║
+║  📋 VP-05: Regenerate all voiceover files                                ║
+║  📋 VP-06: Update Remotion scenes                                        ║
+║  📋 VP-07: Final render to MP4                                           ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
 
 ---
 

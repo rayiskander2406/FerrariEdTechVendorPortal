@@ -112,7 +112,7 @@ async function runTests() {
 
   // Test 8: Database stats
   console.log("📊 Database Stats:");
-  const stats = getDbStats();
+  const stats = await getDbStats();
   console.log(`   Vendors: ${stats.vendors}`);
   console.log(`   Sandboxes: ${stats.sandboxes}`);
   console.log(`   Audit Logs: ${stats.auditLogs}`);

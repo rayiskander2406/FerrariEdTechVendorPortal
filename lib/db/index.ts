@@ -80,6 +80,7 @@ function randomHex(bytes: number): string {
 /**
  * Generate a UUID v4
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function generateUuid(): string {
   return crypto.randomUUID();
 }
@@ -171,7 +172,7 @@ function toSandboxCredentials(prismaSandbox: {
  */
 function toAuditLog(prismaLog: {
   id: string;
-  vendorId: string;
+  vendorId: string | null;
   action: string;
   resourceType: string;
   resourceId: string | null;
@@ -179,10 +180,11 @@ function toAuditLog(prismaLog: {
   ipAddress: string | null;
   userAgent: string | null;
   timestamp: Date;
+  retainUntil?: Date | null;
 }): AuditLog {
   return {
     id: prismaLog.id,
-    vendorId: prismaLog.vendorId,
+    vendorId: prismaLog.vendorId || "",
     action: prismaLog.action,
     resourceType: prismaLog.resourceType,
     resourceId: prismaLog.resourceId ?? undefined,

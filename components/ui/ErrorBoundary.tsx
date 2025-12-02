@@ -152,7 +152,6 @@ export function ChatErrorBoundary({ children }: { children: ReactNode }): ReactN
   return (
     <ErrorBoundary
       componentName="Chat"
-      children={children}
       fallbackRender={({ error, reset }) => (
         <div className="flex flex-col items-center justify-center h-full p-8 bg-gray-50">
           <div className="text-gray-400 mb-4">
@@ -188,7 +187,9 @@ export function ChatErrorBoundary({ children }: { children: ReactNode }): ReactN
           </button>
         </div>
       )}
-    />
+    >
+      {children}
+    </ErrorBoundary>
   );
 }
 
@@ -207,7 +208,6 @@ export function FormErrorBoundary({
   return (
     <ErrorBoundary
       componentName={`Form:${formName || "Unknown"}`}
-      children={children}
       fallbackRender={({ error, reset }) => (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-start gap-3">
@@ -246,7 +246,9 @@ export function FormErrorBoundary({
           </div>
         </div>
       )}
-    />
+    >
+      {children}
+    </ErrorBoundary>
   );
 }
 

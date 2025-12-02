@@ -914,6 +914,7 @@ export async function getMockPodsDatabaseAsync(): Promise<PodsApplication[]> {
 }
 
 // Static PoDS records for demo purposes
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getStaticPodsRecords(): PodsApplication[] {
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

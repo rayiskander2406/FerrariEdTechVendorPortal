@@ -14,10 +14,10 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { type VendorContext as VendorContextType, type AccessTier, type SandboxCredentials, type IntegrationConfig } from "@/lib/types";
+import { type VendorContext as VendorContextType } from "@/lib/types";
 import { NetworkError, getUserErrorMessage } from "@/lib/errors";
 import { getLastFormTrigger } from "@/lib/config/forms";
-import { useVendor, INITIAL_VENDOR_STATE, type VendorState } from "@/lib/contexts";
+import { useVendor, type VendorState } from "@/lib/contexts";
 
 // =============================================================================
 // TYPES
