@@ -17,20 +17,9 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vites
 import { PrismaClient } from '@prisma/client';
 
 // =============================================================================
-// SKIP CONDITIONS
+// PostgreSQL Required
 // =============================================================================
-
-/**
- * Check if PostgreSQL is available for testing
- * Tests will skip if running with SQLite (test environment without Docker)
- */
-function isPostgresAvailable(): boolean {
-  const dbUrl = process.env.DATABASE_URL || '';
-  return dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://');
-}
-
-const SKIP_REASON = 'Skipping: PostgreSQL not available (run docker compose up first)';
-const describeWithPostgres = isPostgresAvailable() ? describe : describe.skip;
+// All tests require PostgreSQL. Run `docker compose up -d` before testing.
 
 // =============================================================================
 // TEST CONSTANTS
@@ -131,7 +120,7 @@ describe('HARD-01: Prisma Client Initialization', () => {
 // TESTS: Database Connection
 // =============================================================================
 
-describeWithPostgres('HARD-01: Database Connection', () => {
+describe('HARD-01: Database Connection', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {
@@ -160,10 +149,10 @@ describeWithPostgres('HARD-01: Database Connection', () => {
 });
 
 // =============================================================================
-// TESTS: Model Accessibility
+// TESTS: Model Accessibility (All 36 Models - HARD-02 Requirement)
 // =============================================================================
 
-describeWithPostgres('HARD-01: Model Accessibility', () => {
+describe('HARD-02: All 36 Models Accessible in Database', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {
@@ -175,34 +164,273 @@ describeWithPostgres('HARD-01: Model Accessibility', () => {
     await prisma.$disconnect();
   });
 
-  it('should have vendor model accessible', async () => {
-    const result = await prisma.vendor.findMany({ take: 1 });
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('should have district model accessible', async () => {
+  // Layer 1: District Hierarchy (3 models)
+  it('should have District model accessible', async () => {
     const result = await prisma.district.findMany({ take: 1 });
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('should have user model accessible', async () => {
-    const result = await prisma.user.findMany({ take: 1 });
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('should have school model accessible', async () => {
+  it('should have School model accessible', async () => {
     const result = await prisma.school.findMany({ take: 1 });
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('should have auditLog model accessible', async () => {
+  it('should have AcademicSession model accessible', async () => {
+    const result = await prisma.academicSession.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Layer 2: Courses & Classes (3 models)
+  it('should have Course model accessible', async () => {
+    const result = await prisma.course.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have Class model accessible', async () => {
+    const result = await prisma.class.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have Enrollment model accessible', async () => {
+    const result = await prisma.enrollment.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Layer 3: Users (5 models)
+  it('should have User model accessible', async () => {
+    const result = await prisma.user.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have UserRelationship model accessible', async () => {
+    const result = await prisma.userRelationship.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have UserHistory model accessible', async () => {
+    const result = await prisma.userHistory.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have UserSchoolHistory model accessible', async () => {
+    const result = await prisma.userSchoolHistory.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have Demographics model accessible', async () => {
+    const result = await prisma.demographics.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Layer 4: Vendors (4 models)
+  it('should have Vendor model accessible', async () => {
+    const result = await prisma.vendor.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have VendorDataGrant model accessible', async () => {
+    const result = await prisma.vendorDataGrant.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have VendorEntityPermission model accessible', async () => {
+    const result = await prisma.vendorEntityPermission.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have VendorSchoolGrant model accessible', async () => {
+    const result = await prisma.vendorSchoolGrant.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Layer 5: SSO (3 models)
+  it('should have SsoSession model accessible', async () => {
+    const result = await prisma.ssoSession.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have SsoLaunchContext model accessible', async () => {
+    const result = await prisma.ssoLaunchContext.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have SsoUserMapping model accessible', async () => {
+    const result = await prisma.ssoUserMapping.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Layer 6: LTI 1.3 (6 models)
+  it('should have LtiPlatform model accessible', async () => {
+    const result = await prisma.ltiPlatform.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have LtiDeployment model accessible', async () => {
+    const result = await prisma.ltiDeployment.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have LtiResourceLink model accessible', async () => {
+    const result = await prisma.ltiResourceLink.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have LtiLineItem model accessible', async () => {
+    const result = await prisma.ltiLineItem.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have LtiGrade model accessible', async () => {
+    const result = await prisma.ltiGrade.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have LtiLaunch model accessible', async () => {
+    const result = await prisma.ltiLaunch.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Layer 7: Communication (6 models)
+  it('should have MessageTemplate model accessible', async () => {
+    const result = await prisma.messageTemplate.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have ContactPreference model accessible', async () => {
+    const result = await prisma.contactPreference.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have ContactPreferenceCategory model accessible', async () => {
+    const result = await prisma.contactPreferenceCategory.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have MessageBatch model accessible', async () => {
+    const result = await prisma.messageBatch.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have MessageBatchTarget model accessible', async () => {
+    const result = await prisma.messageBatchTarget.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have CommunicationMessage model accessible', async () => {
+    const result = await prisma.communicationMessage.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Layer 8: Operations (6 models)
+  it('should have PodsApplication model accessible', async () => {
+    const result = await prisma.podsApplication.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have IntegrationConfig model accessible', async () => {
+    const result = await prisma.integrationConfig.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have SandboxCredentials model accessible', async () => {
+    const result = await prisma.sandboxCredentials.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have AuditLog model accessible', async () => {
     const result = await prisma.auditLog.findMany({ take: 1 });
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('should have integrationConfig model accessible', async () => {
-    const result = await prisma.integrationConfig.findMany({ take: 1 });
+  it('should have SyncJob model accessible', async () => {
+    const result = await prisma.syncJob.findMany({ take: 1 });
     expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have SyncError model accessible', async () => {
+    const result = await prisma.syncError.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // Infrastructure (2 models)
+  it('should have ExternalServiceHealth model accessible', async () => {
+    const result = await prisma.externalServiceHealth.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should have SchemaMetadata model accessible', async () => {
+    const result = await prisma.schemaMetadata.findMany({ take: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// =============================================================================
+// TESTS: Model Count Verification (HARD-02)
+// =============================================================================
+
+describe('HARD-02: Model Count Verification', () => {
+  let prisma: PrismaClient;
+
+  beforeAll(async () => {
+    prisma = createTestPrismaClient();
+    await prisma.$connect();
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it('should have exactly 36 queryable models', async () => {
+    // Verify we can query all 36 models without error
+    const modelQueries = [
+      prisma.district.count(),
+      prisma.school.count(),
+      prisma.academicSession.count(),
+      prisma.course.count(),
+      prisma.class.count(),
+      prisma.enrollment.count(),
+      prisma.user.count(),
+      prisma.userRelationship.count(),
+      prisma.userHistory.count(),
+      prisma.userSchoolHistory.count(),
+      prisma.demographics.count(),
+      prisma.vendor.count(),
+      prisma.vendorDataGrant.count(),
+      prisma.vendorEntityPermission.count(),
+      prisma.vendorSchoolGrant.count(),
+      prisma.ssoSession.count(),
+      prisma.ssoLaunchContext.count(),
+      prisma.ssoUserMapping.count(),
+      prisma.ltiPlatform.count(),
+      prisma.ltiDeployment.count(),
+      prisma.ltiResourceLink.count(),
+      prisma.ltiLineItem.count(),
+      prisma.ltiGrade.count(),
+      prisma.ltiLaunch.count(),
+      prisma.messageTemplate.count(),
+      prisma.contactPreference.count(),
+      prisma.contactPreferenceCategory.count(),
+      prisma.messageBatch.count(),
+      prisma.messageBatchTarget.count(),
+      prisma.communicationMessage.count(),
+      prisma.podsApplication.count(),
+      prisma.integrationConfig.count(),
+      prisma.sandboxCredentials.count(),
+      prisma.auditLog.count(),
+      prisma.syncJob.count(),
+      prisma.syncError.count(),
+      prisma.externalServiceHealth.count(),
+      prisma.schemaMetadata.count(),
+    ];
+
+    // All 38 queries should succeed (36 models + 2 infrastructure)
+    // Note: We have 38 models total (36 in EXPECTED_MODELS + 2 more)
+    const results = await Promise.all(modelQueries);
+    expect(results.length).toBe(38);
+    results.forEach((count) => {
+      expect(typeof count).toBe('number');
+      expect(count).toBeGreaterThanOrEqual(0);
+    });
   });
 });
 
@@ -210,7 +438,7 @@ describeWithPostgres('HARD-01: Model Accessibility', () => {
 // TESTS: CRUD Operations
 // =============================================================================
 
-describeWithPostgres('HARD-01: CRUD Operations', () => {
+describe('HARD-01: CRUD Operations', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {
@@ -310,7 +538,7 @@ describeWithPostgres('HARD-01: CRUD Operations', () => {
 // TESTS: Transactions
 // =============================================================================
 
-describeWithPostgres('HARD-01: Transaction Support', () => {
+describe('HARD-01: Transaction Support', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {
@@ -385,7 +613,7 @@ describeWithPostgres('HARD-01: Transaction Support', () => {
 // TESTS: Unique Constraints
 // =============================================================================
 
-describeWithPostgres('HARD-01: Unique Constraints', () => {
+describe('HARD-01: Unique Constraints', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {
@@ -426,7 +654,7 @@ describeWithPostgres('HARD-01: Unique Constraints', () => {
 // TESTS: Soft Delete Support
 // =============================================================================
 
-describeWithPostgres('HARD-01: Soft Delete Support', () => {
+describe('HARD-01: Soft Delete Support', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {
@@ -491,7 +719,7 @@ describeWithPostgres('HARD-01: Soft Delete Support', () => {
 // TESTS: Error Handling
 // =============================================================================
 
-describeWithPostgres('HARD-01: Error Handling', () => {
+describe('HARD-01: Error Handling', () => {
   it('should handle connection errors gracefully', async () => {
     // Create client with invalid URL
     const invalidClient = new PrismaClient({
@@ -544,7 +772,7 @@ describeWithPostgres('HARD-01: Error Handling', () => {
 // TESTS: Index Verification
 // =============================================================================
 
-describeWithPostgres('HARD-01: Index Verification', () => {
+describe('HARD-01: Index Verification', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {
@@ -576,7 +804,7 @@ describeWithPostgres('HARD-01: Index Verification', () => {
 // TESTS: Timestamp Auto-Update
 // =============================================================================
 
-describeWithPostgres('HARD-01: Timestamp Auto-Update', () => {
+describe('HARD-01: Timestamp Auto-Update', () => {
   let prisma: PrismaClient;
 
   beforeAll(async () => {

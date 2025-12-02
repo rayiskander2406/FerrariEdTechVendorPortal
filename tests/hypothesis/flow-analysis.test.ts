@@ -778,7 +778,7 @@ describe("Flow 5: Cross-Cutting Concerns", () => {
   describe("H5.1 (80%): Client/server boundary - API calls", () => {
     // This tests that the modules work correctly when imported
     it("lib/db functions should work when called directly", async () => {
-      clearAllStores();
+      await clearAllStores();
 
       const vendor = await createVendor({
         podsLiteInput: {

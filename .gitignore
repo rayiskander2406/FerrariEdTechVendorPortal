@@ -30,9 +30,8 @@ yarn-error.log*
 .env.local
 .env*.local
 
-# Keep .env.example and .env.test (committed to repo)
+# Keep .env.example (committed to repo)
 !.env.example
-!.env.test
 
 # Claude Code local settings (user-specific)
 .claude/settings.local.json

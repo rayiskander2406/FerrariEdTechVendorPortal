@@ -1272,6 +1272,7 @@ model SandboxCredentials {
   environment        String @default("sandbox")
   status             String @default("active")
   rateLimitPerMinute Int    @default(60)
+  allowedEndpoints   String @default("[]") // JSON array of allowed OneRoster endpoints
 
   // Timestamps
   expiresAt  DateTime

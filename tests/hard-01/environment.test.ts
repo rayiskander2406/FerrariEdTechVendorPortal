@@ -276,29 +276,10 @@ describe('HARD-01: Environment File Security', () => {
 });
 
 // =============================================================================
-// TESTS: .env.test File (for testing)
+// NOTE: .env.test removed - PostgreSQL required for all tests
 // =============================================================================
-
-describe('HARD-01: .env.test File', () => {
-  it('should exist for test environment', () => {
-    expect(fs.existsSync(ENV_TEST_PATH)).toBe(true);
-  });
-
-  it('should have DATABASE_URL pointing to test database', () => {
-    const env = parseEnvFile(ENV_TEST_PATH);
-
-    // For tests, might use SQLite or separate PostgreSQL
-    const dbUrl = env.DATABASE_URL;
-    expect(dbUrl).toBeDefined();
-
-    // Should be a test database, not production
-    const isTestDb =
-      dbUrl.includes('test') ||
-      dbUrl.includes('sqlite') ||
-      dbUrl.includes(':memory:');
-    expect(isTestDb).toBe(true);
-  });
-});
+// Tests now use .env with PostgreSQL configuration.
+// Run `docker compose up -d` before running tests.
 
 // =============================================================================
 // TESTS: Connection String Validation

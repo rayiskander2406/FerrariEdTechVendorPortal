@@ -112,7 +112,7 @@ function toVendor(prismaVendor: {
   contactName: string;
   website: string | null;
   description: string | null;
-  accessTier: string;
+  defaultAccessTier: string;
   podsStatus: string;
   podsApplicationId: string | null;
   createdAt: Date;
@@ -125,7 +125,7 @@ function toVendor(prismaVendor: {
     contactName: prismaVendor.contactName,
     website: prismaVendor.website ?? undefined,
     description: prismaVendor.description ?? undefined,
-    accessTier: prismaVendor.accessTier as AccessTier,
+    accessTier: prismaVendor.defaultAccessTier as AccessTier,
     podsStatus: prismaVendor.podsStatus as PodsStatus,
     podsApplicationId: prismaVendor.podsApplicationId ?? undefined,
     createdAt: prismaVendor.createdAt,
@@ -263,7 +263,7 @@ export async function createVendor(data: CreateVendorInput): Promise<Vendor> {
       contactName: data.podsLiteInput.contactName,
       website: data.podsLiteInput.websiteUrl,
       description: data.podsLiteInput.applicationDescription,
-      accessTier,
+      defaultAccessTier: accessTier,
       podsStatus,
       podsApplicationId: `PODS-${new Date().getFullYear()}-${String(count + 1).padStart(3, "0")}`,
     },
@@ -277,7 +277,7 @@ export async function createVendor(data: CreateVendorInput): Promise<Vendor> {
     resourceId: vendor.id,
     details: {
       vendorName: vendor.name,
-      accessTier: vendor.accessTier,
+      accessTier: vendor.defaultAccessTier,
       podsStatus: vendor.podsStatus,
     },
   });

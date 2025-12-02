@@ -5,16 +5,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    // Use separate test database to avoid polluting dev data
+    // PostgreSQL required - run `docker compose up -d` before testing
+    // DATABASE_URL loaded from .env file (not overridden here)
     env: {
-      DATABASE_URL: 'file:./prisma/test.db',
       NODE_ENV: 'test',
       SHADOW_MODE: 'true',  // Enable shadow mode verification tests
     },
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx', 'tests/**/*.spec.ts', 'tests/**/*.spec.tsx'],
     exclude: ['node_modules', '.next'],
     // Run each test file in its own process for database isolation
-    // This prevents cross-file pollution with SQLite + Prisma
     pool: 'forks',
     poolOptions: {
       forks: {

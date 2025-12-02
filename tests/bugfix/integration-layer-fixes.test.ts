@@ -14,7 +14,18 @@
  * FIX-006: ACADEMIC_SESSIONS not mapped in dataElementsToEndpoints
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { clearAllStores } from "@/lib/db";
+
+// Clean database before each test for isolation
+beforeEach(async () => {
+  await clearAllStores();
+});
+
+// Clean database after all tests complete
+afterAll(async () => {
+  await clearAllStores();
+});
 
 // =============================================================================
 // FIX-001: Semantic Mismatch - Form Values to Endpoint Mapping
@@ -323,9 +334,9 @@ describe("FIX-005: SSO Flow Vendor Recognition", () => {
   describe("Handler Tests - check_status with vendorId", () => {
     it("check_status should accept vendor_id and return valid status", async () => {
       const { handleCheckStatus } = await import("@/lib/ai/handlers");
-      const { createVendor, clearAllStores } = await import("@/lib/db");
+      const { createVendor } = await import("@/lib/db");
 
-      clearAllStores();
+      // Database is cleared by global beforeEach
 
       // Create a vendor first
       const vendor = await createVendor({
@@ -386,10 +397,10 @@ describe("FIX-006: ACADEMIC_SESSIONS Endpoint Mapping", () => {
 
   describe("Integration Tests", () => {
     it("selecting only ACADEMIC_SESSIONS should create sandbox with only /academicSessions", async () => {
-      const { createSandbox, createVendor, clearAllStores } = await import("@/lib/db");
+      const { createSandbox, createVendor } = await import("@/lib/db");
       const { dataElementsToEndpoints } = await import("@/lib/config/oneroster");
 
-      clearAllStores();
+      // Database is cleared by global beforeEach
 
       const vendor = await createVendor({
         podsLiteInput: {
@@ -463,9 +474,9 @@ describe("NON-REGRESSION: Existing Functionality", () => {
 
     it("handleProvisionSandbox should still work with resource names", async () => {
       const { handleProvisionSandbox } = await import("@/lib/ai/handlers");
-      const { createVendor, clearAllStores } = await import("@/lib/db");
+      const { createVendor } = await import("@/lib/db");
 
-      clearAllStores();
+      // Database is cleared by global beforeEach
 
       const vendor = await createVendor({
         podsLiteInput: {

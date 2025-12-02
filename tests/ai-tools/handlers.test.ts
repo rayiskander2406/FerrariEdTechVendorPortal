@@ -7,7 +7,7 @@
  * @module tests/ai-tools/handlers
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import {
   handleLookupPods,
   handleSubmitPodsLite,
@@ -27,6 +27,16 @@ import {
 import { createVendor, createSandbox, clearAllStores } from '@/lib/db';
 import type { PodsLiteInput } from '@/lib/types';
 import { PodsLiteSchema, createMockFactory } from '@/lib/schemas';
+
+// Clean database before each test for isolation
+beforeEach(async () => {
+  await clearAllStores();
+});
+
+// Clean database after all tests complete
+afterAll(async () => {
+  await clearAllStores();
+});
 
 // =============================================================================
 // TEST FIXTURES (Schema-First)

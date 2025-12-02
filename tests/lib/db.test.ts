@@ -6,7 +6,7 @@
  * @module tests/lib/db
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import {
   createVendor,
   getVendor,
@@ -27,6 +27,16 @@ import {
   seedDatabase,
 } from '@/lib/db';
 import type { PodsLiteInput } from '@/lib/types';
+
+// Clean database before each test for isolation
+beforeEach(async () => {
+  await clearAllStores();
+});
+
+// Clean database after all tests complete
+afterAll(async () => {
+  await clearAllStores();
+});
 
 // =============================================================================
 // FIXTURES

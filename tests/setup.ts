@@ -2,15 +2,57 @@
  * Vitest Test Setup
  *
  * This file runs before all tests and sets up the test environment.
- * Uses a separate test database (configured in vitest.config.ts).
+ *
+ * REQUIREMENT: PostgreSQL must be running via `docker compose up -d`
  */
 
 import { beforeEach, afterEach, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { clearAllStores } from '@/lib/db';
-import { clearSessionPodsSubmissions } from '@/lib/data/synthetic';
+import * as fs from 'fs';
+import * as path from 'path';
 
+// =============================================================================
+// Load .env file for PostgreSQL configuration
+// =============================================================================
+
+const envPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  const content = fs.readFileSync(envPath, 'utf-8');
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex > 0) {
+        const key = trimmed.substring(0, eqIndex);
+        let value = trimmed.substring(eqIndex + 1);
+        // Remove surrounding quotes
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        // Only set if not already set (allow env override)
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    }
+  }
+}
+
+// Verify PostgreSQL is configured
+const dbUrl = process.env.DATABASE_URL || '';
+if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+  console.error('\n❌ PostgreSQL not configured!');
+  console.error('   Run: docker compose up -d');
+  console.error('   Current DATABASE_URL:', dbUrl.substring(0, 30) + '...\n');
+}
+
+console.log('[Test Setup] Using PostgreSQL:', dbUrl.substring(0, 50) + '...');
+
+// =============================================================================
 // Mock localStorage for Node.js environment
+// =============================================================================
+
 const localStorageMock = {
   store: {} as Record<string, string>,
   getItem: vi.fn((key: string) => localStorageMock.store[key] || null),
@@ -35,51 +77,14 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
 });
 
-/**
- * Safely try to clear database stores
- * Returns true if successful, false if database is not available
- */
-async function safeClearDatabase(): Promise<boolean> {
-  try {
-    await clearAllStores();
-    return true;
-  } catch (error) {
-    // Database cleanup failed - this is OK for file-based tests
-    // that don't need database operations (e.g., HARD-01 config tests)
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('postgresql://') || errorMessage.includes('postgres://') ||
-        errorMessage.includes('Error validating datasource')) {
-      // PostgreSQL/SQLite mismatch - database not available for this test
-      return false;
-    }
-    // Re-throw unexpected errors
-    throw error;
-  }
-}
+// =============================================================================
+// Test Lifecycle Hooks
+// =============================================================================
 
-// Clear all state between tests (before each individual test)
-// Note: clearAllStores may fail for file-based tests that don't need database
-// We catch the error to allow file-only tests to run
-beforeEach(async () => {
-  const dbAvailable = await safeClearDatabase();
-
-  // Only try to clear PoDS submissions if DB is available
-  // clearSessionPodsSubmissions calls an async function that will fail if DB unavailable
-  if (dbAvailable) {
-    try {
-      clearSessionPodsSubmissions();
-    } catch {
-      // Ignore - database not available
-    }
-  }
-
+beforeEach(() => {
   localStorageMock.clear();
 });
 
 afterEach(() => {
   vi.clearAllMocks();
 });
-
-// Mock environment variables
-process.env.USE_MOCK_DB = 'true';
-// NODE_ENV is already set by vitest

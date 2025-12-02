@@ -99,9 +99,9 @@ function createGetRequest(
 // =============================================================================
 
 describe("Security Integration: XSS Sanitization in Vendors API", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     clearAllRateLimits();
-    clearAllStores();
+    await clearAllStores();
   });
 
   afterEach(() => {
@@ -186,9 +186,9 @@ describe("Security Integration: XSS Sanitization in Vendors API", () => {
 // =============================================================================
 
 describe("Security Integration: Rate Limiting in Vendors API", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     clearAllRateLimits();
-    clearAllStores();
+    await clearAllStores();
   });
 
   afterEach(() => {
@@ -361,9 +361,9 @@ describe("Security Integration: Rate Limiting in Vendors API", () => {
 // =============================================================================
 
 describe("Security Integration: Payload Validation in Vendors API", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     clearAllRateLimits();
-    clearAllStores();
+    await clearAllStores();
   });
 
   afterEach(() => {
@@ -473,9 +473,9 @@ describe("Security Integration: Payload Validation in Vendors API", () => {
 // =============================================================================
 
 describe("Security Integration: Combined Security Checks", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     clearAllRateLimits();
-    clearAllStores();
+    await clearAllStores();
   });
 
   afterEach(() => {
@@ -558,9 +558,9 @@ describe("Security Integration: Combined Security Checks", () => {
 // =============================================================================
 
 describe("Security Integration: Edge Cases", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     clearAllRateLimits();
-    clearAllStores();
+    await clearAllStores();
   });
 
   afterEach(() => {
