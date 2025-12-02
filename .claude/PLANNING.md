@@ -1,14 +1,272 @@
 # PLANNING - SchoolDay Vendor Portal
 
-**Last Updated**: November 29, 2025
+**Last Updated**: December 2, 2025
 **Mission**: Disrupt Clever and become the dominant K-12 integration platform in 18 months
-**Version**: MVP → v1.0 → v2.0 → v3.0 (Market Leader)
+**Version**: MVP ✅ → v1.0-hardening 🚧 → v1.0 → v2.0 → v3.0 (Market Leader)
 
 > **Strategic Context**: Before starting development, read [STRATEGY.md](./STRATEGY.md) for the "True North" - why we chose Ed-Fi as our internal data model, the competitive analysis, and the SSO strategy.
 
 ---
 
-## Current Release: MVP
+## Current Release: v1.0-hardening (Database Schema Implementation)
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    v1.0-HARDENING RELEASE PLAN                            ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  GOAL: Implement production-ready database schema with all 20 mitigations║
+║  STATUS: 🚧 In Progress                                                  ║
+║                                                                          ║
+║  CONTEXT:                                                                ║
+║  ────────                                                                ║
+║  • Expert-reviewed schema design: DATA_SCHEMA_DESIGN.md (28 models)      ║
+║  • Mitigation plan approved: SCHEMA_MITIGATION_PLAN.md (20 mitigations)  ║
+║  • Prisma schema created: prisma/schema.prisma (36 models)               ║
+║  • Vault schema created: prisma/vault.schema.prisma (6 models)           ║
+║                                                                          ║
+║  ┌────────────────────────────────────────────────────────────────────┐ ║
+║  │ COMPLETED                          │ REMAINING                     │ ║
+║  ├────────────────────────────────────┼───────────────────────────────┤ ║
+║  │ ✅ Expert schema review            │ 📋 HARD-01: PostgreSQL setup  │ ║
+║  │    14 concerns identified          │    docker-compose.yml         │ ║
+║  │ ✅ Mitigation plan (20 items)      │ 📋 HARD-02: Run migrations    │ ║
+║  │    6 expert additions              │    npx prisma migrate dev     │ ║
+║  │ ✅ Main Prisma schema              │ 📋 HARD-03: Vault database    │ ║
+║  │    36 models, all mitigations      │    Separate Prisma client     │ ║
+║  │ ✅ Vault schema                    │ 📋 HARD-04: Update app code   │ ║
+║  │    6 security models               │    Use new schema in app      │ ║
+║  │                                    │ 📋 HARD-05: Seed demo data    │ ║
+║  │                                    │    LAUSD 5 schools + students │ ║
+║  └────────────────────────────────────┴───────────────────────────────┘ ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+### v1.0-hardening GO/NO-GO Gates
+
+| Gate | Criteria | Test | Status |
+|------|----------|------|--------|
+| **SCHEMA** | All 36 main + 6 vault models defined | Schema validation | ✅ Pass |
+| **MITIGATIONS** | All 20 mitigations applied | Code review | ✅ Pass |
+| **POSTGRESQL** | PostgreSQL runs locally via Docker | `docker-compose up` | 📋 Pending |
+| **MIGRATION** | Migrations run without errors | `npx prisma migrate dev` | 📋 Pending |
+| **VAULT** | Separate vault database configured | Vault client test | 📋 Pending |
+| **SEED** | Demo data seeded successfully | Query test | 📋 Pending |
+| **TESTS** | Existing 2050 tests still pass | `npm test` | 📋 Pending |
+
+### v1.0-hardening Requirements
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    v1.0-HARDENING REQUIREMENTS                            ║
+╠══════════════════════════════════════════════════════════════════════════╣
+
+  MUST HAVE (P1) - Block release if not done
+  ────────────────────────────────────────────
+  📋 HARD-01: Set up PostgreSQL for local development
+     - Create docker-compose.yml with PostgreSQL 15
+     - Configure main database (schoolday_dev)
+     - Configure vault database (schoolday_vault)
+     - Update .env files with connection strings
+
+  📋 HARD-02: Create and run initial migrations
+     - Generate Prisma client for main schema
+     - Run npx prisma migrate dev --name init
+     - Verify all 36 models created in database
+
+  📋 HARD-03: Implement vault database infrastructure
+     - Create separate Prisma client for vault
+     - Configure vault connection in lib/vault/client.ts
+     - Implement TokenMapping CRUD operations
+     - Add TokenAccessLog on all vault operations
+
+  📋 HARD-04: Update application code to use new schema
+     - Update lib/db/index.ts for new models
+     - Ensure backward compatibility with existing API
+     - Update synthetic data generator for new models
+
+  📋 HARD-05: Seed demo data for LAUSD
+     - 1 District (LAUSD)
+     - 5 Schools (matching current demo)
+     - AcademicSession for 2024-2025
+     - 1000 Users (students + teachers)
+     - Classes and Enrollments
+
+  SHOULD HAVE (P2) - Improve quality but not blocking
+  ─────────────────────────────────────────────────────
+  📋 HARD-06: Add read replica configuration
+     - Create prismaRead client for list operations
+     - Document when to use primary vs replica
+
+  📋 HARD-07: Implement circuit breaker for external services
+     - Initialize ExternalServiceHealth records
+     - Add health check endpoints
+
+  NICE TO HAVE (P3) - If time permits
+  ────────────────────────────────────
+  📋 HARD-08: Implement SyncJob infrastructure
+     - Create sync service scaffold
+     - Add idempotency key validation
+
+  📋 HARD-09: Add vault rate limiting middleware
+     - Implement checkRateLimit() function
+     - Add security alerts for threshold breach
+
+  OUT OF SCOPE (Deferred to v1.0)
+  ────────────────────────────────
+  • Full SIS sync implementation
+  • Multi-district production setup
+  • Vault HSM integration
+  • Production deployment
+
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+### v1.0-hardening Implementation Plan
+
+| Task | Days | Focus | Key Deliverables |
+|------|------|-------|------------------|
+| **HARD-01** | 0.5 | PostgreSQL | docker-compose.yml, .env configuration |
+| **HARD-02** | 0.5 | Migrations | Database created, all models verified |
+| **HARD-03** | 1 | Vault | Vault client, TokenMapping service |
+| **HARD-04** | 1 | App Code | Updated lib/db, API routes |
+| **HARD-05** | 0.5 | Seed Data | LAUSD demo data in database |
+| **Total** | 3.5 days | | Production-ready schema |
+
+### v1.0-hardening Risk Assessment
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    v1.0-HARDENING RISK ASSESSMENT                         ║
+╠══════════════════════════════════════════════════════════════════════════╣
+
+  HIGH RISK
+  ─────────
+  Risk: Schema changes break existing tests
+  Impact: 2050 tests might fail, blocking progress
+  Mitigation: Run tests after each model change; use feature flag for new schema
+
+  Risk: Vault database adds complexity
+  Impact: Deployment becomes more complex
+  Mitigation: Start with same PostgreSQL instance, separate later
+
+  MEDIUM RISK
+  ───────────
+  Risk: Migration performance on large datasets
+  Impact: Slow startup in production
+  Mitigation: Test with realistic data volumes; add appropriate indexes
+
+  Risk: Prisma client generation conflicts
+  Impact: TypeScript errors in codebase
+  Mitigation: Separate output directories for main and vault clients
+
+  LOW RISK
+  ────────
+  Risk: Docker not available on dev machine
+  Impact: Cannot run PostgreSQL locally
+  Mitigation: Use hosted PostgreSQL (Supabase/Neon) as alternative
+
+  DEPENDENCIES
+  ────────────
+  • Docker for PostgreSQL (or hosted alternative)
+  • Prisma CLI installed globally
+  • Node.js 18+ for Prisma client
+
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+### v1.0-hardening Architecture: Schema Layers
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    SCHEMA ARCHITECTURE (42 MODELS)                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  MAIN DATABASE (36 models)                                              │
+│  ─────────────────────────                                              │
+│                                                                         │
+│  Layer 1: District Hierarchy                                            │
+│  ├── District, School                                                   │
+│                                                                         │
+│  Layer 2: Academic Structure                                            │
+│  ├── AcademicSession, Course                                            │
+│                                                                         │
+│  Layer 3: Classes & Enrollments                                         │
+│  ├── Class, Enrollment                                                  │
+│                                                                         │
+│  Layer 4: Unified Users (Mitigation #2)                                 │
+│  ├── User (students, teachers, parents, admins)                         │
+│  ├── UserRelationship (parent-child links)                              │
+│  ├── UserHistory (SCD Type 2 - Mitigation #15)                          │
+│  ├── UserSchoolHistory (transfers)                                      │
+│  └── Demographics                                                       │
+│                                                                         │
+│  Layer 5: Vendor Access Scoping                                         │
+│  ├── Vendor, VendorDataGrant                                            │
+│  ├── VendorEntityPermission (junction - Mitigation #5)                  │
+│  └── VendorSchoolGrant                                                  │
+│                                                                         │
+│  Layer 6: SSO Integration                                               │
+│  ├── SsoSession, SsoLaunchContext, SsoUserMapping                       │
+│                                                                         │
+│  Layer 7: LTI 1.3 Integration                                           │
+│  ├── LtiPlatform, LtiDeployment, LtiResourceLink                        │
+│  ├── LtiLineItem, LtiGrade, LtiLaunch                                   │
+│                                                                         │
+│  Layer 8: CPaaS Communication                                           │
+│  ├── MessageTemplate, ContactPreference                                 │
+│  ├── ContactPreferenceCategory (junction - Mitigation #5)               │
+│  ├── MessageBatch, MessageBatchTarget (junction - Mitigation #5)        │
+│  └── CommunicationMessage                                               │
+│                                                                         │
+│  Infrastructure                                                         │
+│  ├── PodsApplication, IntegrationConfig                                 │
+│  ├── SandboxCredentials, AuditLog                                       │
+│  ├── SyncJob, SyncError (Mitigation #16)                                │
+│  ├── ExternalServiceHealth (Circuit Breaker - Mitigation #17)           │
+│  └── SchemaMetadata (Versioning - Mitigation #14)                       │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  VAULT DATABASE (6 models) - Separate, Hardened                         │
+│  ────────────────────────────────────────────────                       │
+│  ├── TokenMapping (token ↔ real identifier)                             │
+│  ├── TokenAccessLog (immutable audit - Mitigation #18)                  │
+│  ├── VaultRateLimit (extraction prevention - Mitigation #20)            │
+│  ├── VaultRateLimitConfig (configurable limits)                         │
+│  ├── DetokenizationApproval (bulk operation control)                    │
+│  └── SecurityAlert (suspicious activity tracking)                       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### v1.0-hardening Key Mitigations Applied
+
+| # | Issue | Implementation | Status |
+|---|-------|---------------|--------|
+| 2 | Dual identity | Unified User model with role field | ✅ Schema |
+| 3 | accessTier duplication | VendorDataGrant is source of truth | ✅ Schema |
+| 4 | Temporal modeling | effectiveStart/effectiveEnd on Enrollment | ✅ Schema |
+| 5 | JSON fields | Junction tables for all lists | ✅ Schema |
+| 6 | Sync strategy | Sync metadata on all entities | ✅ Schema |
+| 7 | Soft deletes | deletedAt + retainUntil on all entities | ✅ Schema |
+| 8 | Token security | Separate vault database | ✅ Schema |
+| 9 | Status enums | Standardized across all models | ✅ Schema |
+| 10 | Missing indexes | Comprehensive index strategy | ✅ Schema |
+| 11 | Timestamp inconsistency | Standard timestamps everywhere | ✅ Schema |
+| 12 | SQLite/PostgreSQL | PostgreSQL everywhere | ✅ Schema |
+| 14 | Schema versioning | SchemaMetadata table | ✅ Schema |
+| 15 | SCD Type 2 | UserHistory for point-in-time queries | ✅ Schema |
+| 16 | Idempotency | SyncJob.idempotencyKey | ✅ Schema |
+| 17 | Circuit breaker | ExternalServiceHealth | ✅ Schema |
+| 18 | Vault audit | TokenAccessLog | ✅ Schema |
+| 19 | Detokenize reason | Required in TokenAccessLog | ✅ Schema |
+| 20 | Vault rate limit | VaultRateLimit table | ✅ Schema |
+
+---
+
+## Previous Release: MVP (Complete)
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
