@@ -7,6 +7,7 @@ import {
   useVideoConfig,
   interpolate,
   spring,
+  Img,
 } from 'remotion';
 
 // Color palette - LAUSD colors
@@ -17,21 +18,23 @@ const COLORS = {
   successGreen: '#22C55E',
   riskRed: '#EF4444',
   gray: '#64748B',
+  coral: '#FF8A80', // For contrast against navy
 };
 
-// v1.2 Scene durations - 1.2X sped-up Edge TTS
-// Total: 73.95 seconds
+// v1.2.5 Scene durations - RAW Edge TTS (NO speedup, like v1.0)
+// Total: 97.82 seconds
 const SCENES = {
-  hook: {start: 0, duration: Math.round(10.64 * 30)},                          // 0-10.6s PowerSchool punch
-  problem: {start: Math.round(10.64 * 30), duration: Math.round(11.68 * 30)},  // 10.6-22.3s
-  solution: {start: Math.round(22.32 * 30), duration: Math.round(12.31 * 30)}, // 22.3-34.6s
-  integration: {start: Math.round(34.63 * 30), duration: Math.round(13.68 * 30)}, // 34.6-48.3s
-  benefits: {start: Math.round(48.31 * 30), duration: Math.round(11.16 * 30)}, // 48.3-59.5s
-  leverage: {start: Math.round(59.47 * 30), duration: Math.round(10.86 * 30)}, // 59.5-70.3s
-  close: {start: Math.round(70.33 * 30), duration: Math.round(3.62 * 30)},     // 70.3-74.0s
+  hook: {start: 0, duration: Math.round(9.79 * 30)},                               // 0-9.79s PowerSchool punch
+  hookStats: {start: Math.round(9.79 * 30), duration: Math.round(12.38 * 30)},     // 9.79-22.17s LAUSD stats
+  problem: {start: Math.round(22.17 * 30), duration: Math.round(14.04 * 30)},      // 22.17-36.21s
+  solution: {start: Math.round(36.21 * 30), duration: Math.round(14.78 * 30)},     // 36.21-50.99s
+  integration: {start: Math.round(50.99 * 30), duration: Math.round(16.44 * 30)},  // 50.99-67.43s
+  benefits: {start: Math.round(67.43 * 30), duration: Math.round(13.42 * 30)},     // 67.43-80.85s
+  leverage: {start: Math.round(80.85 * 30), duration: Math.round(13.06 * 30)},     // 80.85-93.91s
+  close: {start: Math.round(93.91 * 30), duration: Math.round(3.91 * 30)},         // 93.91-97.82s
 };
 
-// Scene 1: PowerSchool Punch (v1.2 - short, devastating)
+// Scene 1a: PowerSchool Punch (v1.2 - short, devastating)
 const SceneHook: React.FC = () => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -96,9 +99,80 @@ const SceneHook: React.FC = () => {
           fontSize: 36,
           color: COLORS.white,
           fontWeight: 600,
-          opacity: interpolate(frame, [120, 160], [0, 1], {extrapolateRight: 'clamp'}),
+          opacity: interpolate(frame, [90, 130], [0, 1], {extrapolateRight: 'clamp'}),
         }}>
           The largest K-12 data breach in history.
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Scene 1b: LAUSD Stats (v1.2.4 - with LAUSD context)
+const SceneHookStats: React.FC = () => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+
+  const stats = [
+    {value: '500K', label: 'Students', delay: 15},
+    {value: '1,000', label: 'Schools', delay: 35},
+    {value: '100s', label: 'Vendors/Year', delay: 55},
+  ];
+
+  return (
+    <AbsoluteFill style={{
+      background: `linear-gradient(135deg, ${COLORS.lausdNavy} 0%, #001845 100%)`,
+      justifyContent: 'center',
+      alignItems: 'center',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+    }}>
+      <div style={{textAlign: 'center'}}>
+        {/* LAUSD Header */}
+        <div style={{
+          fontSize: 52,
+          fontWeight: 700,
+          color: COLORS.white,
+          marginBottom: 50,
+          opacity: interpolate(frame, [0, 15], [0, 1], {extrapolateRight: 'clamp'}),
+          letterSpacing: 3,
+        }}>
+          FOR <span style={{color: COLORS.lausdGold}}>LAUSD</span>
+        </div>
+
+        <div style={{display: 'flex', gap: 80, justifyContent: 'center', marginBottom: 60}}>
+          {stats.map((stat, i) => (
+            <div key={i} style={{
+              textAlign: 'center',
+              opacity: interpolate(frame, [stat.delay, stat.delay + 15], [0, 1], {extrapolateRight: 'clamp'}),
+              transform: `scale(${spring({frame: frame - stat.delay, fps, config: {damping: 12}})})`,
+            }}>
+              <div style={{
+                fontSize: 90,
+                fontWeight: 800,
+                color: COLORS.lausdGold,
+                textShadow: '0 0 30px rgba(255,184,28,0.4)',
+              }}>{stat.value}</div>
+              <div style={{fontSize: 28, color: COLORS.white, fontWeight: 500}}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          fontSize: 38,
+          color: COLORS.white,
+          opacity: interpolate(frame, [100, 130], [0, 1], {extrapolateRight: 'clamp'}),
+        }}>
+          Each vendor takes <span style={{color: COLORS.riskRed, fontWeight: 700}}>weeks</span> to review.
+        </div>
+
+        <div style={{
+          marginTop: 25,
+          fontSize: 48,
+          fontWeight: 700,
+          color: COLORS.lausdGold,
+          opacity: interpolate(frame, [160, 190], [0, 1], {extrapolateRight: 'clamp'}),
+        }}>
+          That&apos;s about to change.
         </div>
       </div>
     </AbsoluteFill>
@@ -343,7 +417,7 @@ const SceneBenefits: React.FC = () => {
   const benefits = [
     {icon: '📊', title: '80% Fewer', subtitle: 'Manual Reviews', color: COLORS.successGreen},
     {icon: '📝', title: 'Full Audit', subtitle: 'FERPA/COPPA Built-in', color: COLORS.lausdGold},
-    {icon: '🏛️', title: 'Your Platform', subtitle: 'No Middleman Fees', color: COLORS.lausdNavy},
+    {icon: '🏛️', title: 'Your Platform', subtitle: 'No Middleman Fees', color: COLORS.coral},
   ];
 
   return (
@@ -444,7 +518,7 @@ const SceneLeverage: React.FC = () => {
   );
 };
 
-// Scene 7: Close with Data Sovereignty Tagline (v1.2)
+// Scene 7: Close with Logo and Data Sovereignty Tagline (v1.2.1)
 const SceneClose: React.FC = () => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -458,19 +532,24 @@ const SceneClose: React.FC = () => {
       alignItems: 'center',
     }}>
       <div style={{textAlign: 'center'}}>
+        {/* SchoolDay Logo from website */}
         <div style={{
-          fontSize: 90,
-          fontWeight: 'bold',
-          color: COLORS.white,
-          marginBottom: 25,
+          marginBottom: 40,
           transform: `scale(${spring({frame, fps, config: {damping: 10}})})`,
         }}>
-          SchoolDay
+          <Img
+            src={staticFile('schoolday-logo.svg')}
+            style={{
+              width: 400,
+              height: 'auto',
+              filter: 'brightness(0) invert(1)', // Make it white
+            }}
+          />
         </div>
 
         {/* Data Sovereignty Tagline */}
         <div style={{
-          opacity: interpolate(frame, [30, 60], [0, 1]),
+          opacity: interpolate(frame, [20, 50], [0, 1]),
           display: 'flex',
           gap: 20,
           justifyContent: 'center',
@@ -485,16 +564,21 @@ const SceneClose: React.FC = () => {
   );
 };
 
-// Main composition - v1.2
+// Main composition - v1.2.5
 export const Main: React.FC = () => {
   return (
     <AbsoluteFill style={{backgroundColor: '#000'}}>
-      {/* Single concatenated voiceover - 1.2X sped up */}
+      {/* Single concatenated voiceover - RAW (no speedup, like v1.0) */}
       <Audio src={staticFile('voiceover/full_voiceover.mp3')} />
 
-      {/* Scene 1: PowerSchool Punch */}
+      {/* Scene 1a: PowerSchool Punch */}
       <Sequence from={SCENES.hook.start} durationInFrames={SCENES.hook.duration}>
         <SceneHook />
+      </Sequence>
+
+      {/* Scene 1b: LAUSD Stats (secondary hook) */}
+      <Sequence from={SCENES.hookStats.start} durationInFrames={SCENES.hookStats.duration}>
+        <SceneHookStats />
       </Sequence>
 
       {/* Scene 2: Problem */}
@@ -522,7 +606,7 @@ export const Main: React.FC = () => {
         <SceneLeverage />
       </Sequence>
 
-      {/* Scene 7: Close with Tagline */}
+      {/* Scene 7: Close with Logo + Tagline */}
       <Sequence from={SCENES.close.start} durationInFrames={SCENES.close.duration}>
         <SceneClose />
       </Sequence>
