@@ -1,0 +1,89 @@
+version: "3.8"
+
+# =============================================================================
+# SchoolDay Vendor Portal - Local Development PostgreSQL Setup
+# =============================================================================
+#
+# HARD-01: PostgreSQL setup for local development
+#
+# This docker-compose file configures:
+# - Main database (schoolday_dev) on port 5434
+# - Vault database (schoolday_vault) on port 5433
+#
+# Usage:
+#   docker compose up -d          # Start databases
+#   docker compose down           # Stop databases
+#   docker compose down -v        # Stop and remove volumes (data loss!)
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Main Database - SchoolDay Application Data
+  # ===========================================================================
+  postgres-main:
+    image: postgres:15-alpine
+    container_name: schoolday-postgres-main
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: schoolday_dev
+      POSTGRES_USER: schoolday
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-schoolday_dev_password}
+    volumes:
+      - postgres-main-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U schoolday -d schoolday_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - schoolday-network
+
+  # ===========================================================================
+  # Vault Database - Token Security (Separate, Hardened)
+  # ===========================================================================
+  # SECURITY: This database stores token mappings and should have:
+  # - Different credentials than main database
+  # - Limited network access in production
+  # - Enhanced monitoring and logging
+  # ===========================================================================
+  postgres-vault:
+    image: postgres:15-alpine
+    container_name: schoolday-postgres-vault
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: schoolday_vault
+      POSTGRES_USER: vault
+      POSTGRES_PASSWORD: ${VAULT_POSTGRES_PASSWORD:-schoolday_vault_password}
+    volumes:
+      - postgres-vault-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vault -d schoolday_vault"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - schoolday-network
+
+# =============================================================================
+# Named Volumes for Data Persistence
+# =============================================================================
+volumes:
+  postgres-main-data:
+    name: schoolday-postgres-main-data
+  postgres-vault-data:
+    name: schoolday-postgres-vault-data
+
+# =============================================================================
+# Network Configuration
+# =============================================================================
+networks:
+  schoolday-network:
+    name: schoolday-network
+    driver: bridge

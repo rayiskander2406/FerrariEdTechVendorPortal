@@ -26,7 +26,13 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
+.env.local
 .env*.local
+
+# Keep .env.example and .env.test (committed to repo)
+!.env.example
+!.env.test
 
 # Claude Code local settings (user-specific)
 .claude/settings.local.json
@@ -41,3 +47,7 @@ api.key
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite development databases
+prisma/*.db
+prisma/prisma/

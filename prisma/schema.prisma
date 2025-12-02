@@ -31,40 +31,40 @@ datasource db {
 // =============================================================================
 
 model District {
-  id          String   @id @default(uuid())
-  sourcedId   String   @unique
-  name        String
-  shortCode   String   @unique
-  type        String   @default("district") // district | state | national
+  id        String @id @default(uuid())
+  sourcedId String @unique
+  name      String
+  shortCode String @unique
+  type      String @default("district") // district | state | national
 
   // Identifiers
-  ncesId      String?  @unique
-  stateId     String?
+  ncesId  String? @unique
+  stateId String?
 
   // Metadata
-  timezone    String   @default("America/Los_Angeles")
-  locale      String   @default("en-US")
+  timezone String @default("America/Los_Angeles")
+  locale   String @default("en-US")
 
   // Standard timestamps (Mitigation #11)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime? // Soft delete (Mitigation #7)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete (Mitigation #7)
 
   // Sync metadata (Mitigation #6)
-  externalId      String?
-  externalSource  String?
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced") // synced | pending | conflict | error
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String?
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced") // synced | pending | conflict | error
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  schools           School[]
-  academicSessions  AcademicSession[]
-  courses           Course[]
-  vendorGrants      VendorDataGrant[]
-  ltiPlatforms      LtiPlatform[]
+  schools          School[]
+  academicSessions AcademicSession[]
+  courses          Course[]
+  vendorGrants     VendorDataGrant[]
+  ltiPlatforms     LtiPlatform[]
 
   @@index([shortCode])
   @@index([ncesId])
@@ -74,54 +74,54 @@ model District {
 }
 
 model School {
-  id          String   @id @default(uuid())
-  sourcedId   String   @unique
-  districtId  String
+  id         String @id @default(uuid())
+  sourcedId  String @unique
+  districtId String
 
   // Basic info
-  name        String
-  shortCode   String
-  type        String   // elementary | middle | high | K-8 | K-12
+  name      String
+  shortCode String
+  type      String // elementary | middle | high | K-8 | K-12
 
   // Identifiers
-  ncesId      String?  @unique
-  stateId     String?
+  ncesId  String? @unique
+  stateId String?
 
   // Grade range
-  gradeMin    Int
-  gradeMax    Int
+  gradeMin Int
+  gradeMax Int
 
   // Location (public info, not PII)
-  address     String?
-  city        String?
-  state       String?  @default("CA")
-  zipCode     String?
+  address String?
+  city    String?
+  state   String? @default("CA")
+  zipCode String?
 
   // Contact (public)
-  phone       String?
-  website     String?
+  phone   String?
+  website String?
 
   // Status: EntityStatus (Mitigation #9)
-  status      String   @default("active") // active | inactive | deleted
+  status String @default("active") // active | inactive | deleted
 
   // Standard timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Sync metadata
-  externalId      String?
-  externalSource  String?
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced")
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String?
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced")
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  district           District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  district           District            @relation(fields: [districtId], references: [id], onDelete: Cascade)
   classes            Class[]
-  users              User[] @relation("PrimarySchool")
+  users              User[]              @relation("PrimarySchool")
   vendorSchoolGrants VendorSchoolGrant[]
 
   @@unique([districtId, shortCode])
@@ -138,43 +138,43 @@ model School {
 // =============================================================================
 
 model AcademicSession {
-  id          String   @id @default(uuid())
-  sourcedId   String   @unique
-  districtId  String
+  id         String @id @default(uuid())
+  sourcedId  String @unique
+  districtId String
 
   // Basic info
-  title       String
-  type        String   // schoolYear | semester | term | gradingPeriod
+  title String
+  type  String // schoolYear | semester | term | gradingPeriod
 
   // Dates
-  startDate   DateTime
-  endDate     DateTime
+  startDate DateTime
+  endDate   DateTime
 
   // Hierarchy
-  parentId    String?
+  parentId String?
 
   // Status
-  status      String   @default("active")
+  status String @default("active")
 
   // Standard timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Sync metadata
-  externalId      String?
-  externalSource  String?
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced")
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String?
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced")
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  district    District @relation(fields: [districtId], references: [id], onDelete: Cascade)
-  parent      AcademicSession? @relation("SessionHierarchy", fields: [parentId], references: [id])
-  children    AcademicSession[] @relation("SessionHierarchy")
-  classes     Class[]
+  district District          @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  parent   AcademicSession?  @relation("SessionHierarchy", fields: [parentId], references: [id])
+  children AcademicSession[] @relation("SessionHierarchy")
+  classes  Class[]
 
   @@index([districtId])
   @@index([type])
@@ -183,38 +183,38 @@ model AcademicSession {
 }
 
 model Course {
-  id          String   @id @default(uuid())
-  sourcedId   String   @unique
-  districtId  String
+  id         String @id @default(uuid())
+  sourcedId  String @unique
+  districtId String
 
   // Basic info
-  title       String
-  courseCode  String
+  title      String
+  courseCode String
 
   // Categorization
-  subject     String?
-  gradeLevel  String?
+  subject    String?
+  gradeLevel String?
 
   // Status
-  status      String   @default("active")
+  status String @default("active")
 
   // Standard timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Sync metadata
-  externalId      String?
-  externalSource  String?
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced")
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String?
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced")
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  district    District @relation(fields: [districtId], references: [id], onDelete: Cascade)
-  classes     Class[]
+  district District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  classes  Class[]
 
   @@unique([districtId, courseCode])
   @@index([districtId])
@@ -227,48 +227,48 @@ model Course {
 // =============================================================================
 
 model Class {
-  id                String   @id @default(uuid())
-  sourcedId         String   @unique
+  id                String  @id @default(uuid())
+  sourcedId         String  @unique
   schoolId          String
   courseId          String?
   academicSessionId String?
 
   // Basic info
-  title             String
-  classCode         String?
+  title     String
+  classCode String?
 
   // Schedule
-  period            String?
-  location          String?
+  period   String?
+  location String?
 
   // Grade/Subject
-  gradeLevel        String?
-  subject           String?
+  gradeLevel String?
+  subject    String?
 
   // Status
-  status            String   @default("active")
+  status String @default("active")
 
   // Standard timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Sync metadata
-  externalId      String?
-  externalSource  String?
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced")
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String?
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced")
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  school            School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  course            Course? @relation(fields: [courseId], references: [id])
-  academicSession   AcademicSession? @relation(fields: [academicSessionId], references: [id])
-  enrollments       Enrollment[]
-  ltiResourceLinks  LtiResourceLink[]
-  ltiLineItems      LtiLineItem[]
+  school           School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  course           Course?           @relation(fields: [courseId], references: [id])
+  academicSession  AcademicSession?  @relation(fields: [academicSessionId], references: [id])
+  enrollments      Enrollment[]
+  ltiResourceLinks LtiResourceLink[]
+  ltiLineItems     LtiLineItem[]
 
   @@index([schoolId])
   @@index([courseId])
@@ -278,41 +278,41 @@ model Class {
 }
 
 model Enrollment {
-  id          String   @id @default(uuid())
-  sourcedId   String   @unique
-  userId      String
-  classId     String
+  id        String @id @default(uuid())
+  sourcedId String @unique
+  userId    String
+  classId   String
 
   // Role in class
-  role        String   // student | teacher | aide | administrator
-  isPrimary   Boolean  @default(true)
+  role      String // student | teacher | aide | administrator
+  isPrimary Boolean @default(true)
 
   // Effective dating (Mitigation #4)
-  effectiveStart  DateTime  @default(now())
-  effectiveEnd    DateTime?
+  effectiveStart DateTime  @default(now())
+  effectiveEnd   DateTime?
 
   // Status with history awareness
-  status      String   @default("active") // active | completed | withdrawn | transferred
+  status String @default("active") // active | completed | withdrawn | transferred
 
   // Standard timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  createdBy   String?
-  updatedBy   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
 
   // Sync metadata
-  externalId      String?
-  externalSource  String?
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced")
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String?
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced")
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  class       Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([userId, classId, role, effectiveStart])
   @@index([userId])
@@ -333,58 +333,58 @@ model Enrollment {
 // =============================================================================
 
 model User {
-  id              String   @id @default(uuid())
-  sourcedId       String   @unique
-  token           String   @unique // TKN_STU_, TKN_TCH_, TKN_PAR_, TKN_ADM_
+  id        String @id @default(uuid())
+  sourcedId String @unique
+  token     String @unique // TKN_STU_, TKN_TCH_, TKN_PAR_, TKN_ADM_
 
   // Identity
-  givenName       String
-  familyName      String
-  middleName      String?
+  givenName  String
+  familyName String
+  middleName String?
 
   // Role - includes parents (Mitigation #2)
-  role            String   // student | teacher | parent | administrator | aide
+  role String // student | teacher | parent | administrator | aide
 
   // School association (null for parents who aren't staff)
   primarySchoolId String?
 
   // Contact (real values stored, tokenized on OUTPUT)
-  email           String?
-  phone           String?
+  email String?
+  phone String?
 
   // Status: EntityStatus (Mitigation #9)
-  status          String   @default("active") // active | inactive | deleted
+  status String @default("active") // active | inactive | deleted
 
   // Grade (students only)
-  gradeLevel      String?
+  gradeLevel String?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
-  deletedBy       String?
-  deletionReason  String? // graduated | transferred | withdrawn | data_request
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  deletionReason String? // graduated | transferred | withdrawn | data_request
 
   // Retention policy (Mitigation #7)
-  retainUntil     DateTime?
+  retainUntil DateTime?
 
   // Sync metadata (Mitigation #6)
-  externalId      String?
-  externalSource  String? // lausd_sis | clever | classlink | oneroster
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced")
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String? // lausd_sis | clever | classlink | oneroster
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced")
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  primarySchool       School? @relation("PrimarySchool", fields: [primarySchoolId], references: [id])
+  primarySchool       School?                @relation("PrimarySchool", fields: [primarySchoolId], references: [id])
   enrollments         Enrollment[]
   demographics        Demographics?
-  childRelationships  UserRelationship[] @relation("ParentRelation")
-  parentRelationships UserRelationship[] @relation("ChildRelation")
-  contactPreferences  ContactPreference[] @relation("ParentPreferences")
-  studentPreferences  ContactPreference[] @relation("StudentPreferences")
+  childRelationships  UserRelationship[]     @relation("ParentRelation")
+  parentRelationships UserRelationship[]     @relation("ChildRelation")
+  contactPreferences  ContactPreference[]    @relation("ParentPreferences")
+  studentPreferences  ContactPreference[]    @relation("StudentPreferences")
   ssoSessions         SsoSession[]
   ssoMappings         SsoUserMapping[]
   ltiGrades           LtiGrade[]
@@ -406,35 +406,35 @@ model User {
 
 // User relationship table (Mitigation #2 - parent-child links)
 model UserRelationship {
-  id              String   @id @default(uuid())
-  parentUserId    String   // User with role='parent'
-  childUserId     String   // User with role='student'
+  id           String @id @default(uuid())
+  parentUserId String // User with role='parent'
+  childUserId  String // User with role='student'
 
-  relationshipType String  // mother | father | guardian | grandparent | other
-  isPrimary       Boolean  @default(false)
+  relationshipType String // mother | father | guardian | grandparent | other
+  isPrimary        Boolean @default(false)
 
   // Permissions
-  canViewGrades      Boolean @default(true)
-  canViewAttendance  Boolean @default(true)
-  canReceiveAlerts   Boolean @default(true)
-  canPickup          Boolean @default(false)
+  canViewGrades     Boolean @default(true)
+  canViewAttendance Boolean @default(true)
+  canReceiveAlerts  Boolean @default(true)
+  canPickup         Boolean @default(false)
 
   // Legal
-  hasCustody         Boolean @default(true)
-  legalRestrictions  String?
+  hasCustody        Boolean @default(true)
+  legalRestrictions String?
 
   // Verification
-  verifiedAt      DateTime?
-  verifiedBy      String?
+  verifiedAt DateTime?
+  verifiedBy String?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  parent          User @relation("ParentRelation", fields: [parentUserId], references: [id], onDelete: Cascade)
-  child           User @relation("ChildRelation", fields: [childUserId], references: [id], onDelete: Cascade)
+  parent User @relation("ParentRelation", fields: [parentUserId], references: [id], onDelete: Cascade)
+  child  User @relation("ChildRelation", fields: [childUserId], references: [id], onDelete: Cascade)
 
   @@unique([parentUserId, childUserId])
   @@index([childUserId])
@@ -443,8 +443,8 @@ model UserRelationship {
 
 // User history for SCD Type 2 (Mitigation #15)
 model UserHistory {
-  id              String   @id @default(uuid())
-  userId          String   // Original user ID (not FK - user might be deleted)
+  id     String @id @default(uuid())
+  userId String // Original user ID (not FK - user might be deleted)
 
   // Snapshot of fields at this point in time
   givenName       String
@@ -455,16 +455,16 @@ model UserHistory {
   status          String
 
   // SCD Type 2 fields
-  validFrom       DateTime
-  validTo         DateTime? // null = current record
-  isCurrent       Boolean   @default(true)
+  validFrom DateTime
+  validTo   DateTime? // null = current record
+  isCurrent Boolean   @default(true)
 
   // Change tracking
-  changeReason    String?   // enrollment | transfer | grade_promotion | data_correction
-  changedBy       String?
+  changeReason String? // enrollment | transfer | grade_promotion | data_correction
+  changedBy    String?
 
   // Timestamp
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId, isCurrent])
   @@index([userId, validFrom])
@@ -473,21 +473,21 @@ model UserHistory {
 
 // User school history for transfers (Mitigation #4)
 model UserSchoolHistory {
-  id          String   @id @default(uuid())
-  userId      String
-  schoolId    String
+  id       String @id @default(uuid())
+  userId   String
+  schoolId String
 
   // Period at this school
-  startDate   DateTime
-  endDate     DateTime?
+  startDate DateTime
+  endDate   DateTime?
 
   // Reason for change
-  changeType  String   // enrolled | transferred_in | transferred_out | graduated | withdrawn
+  changeType   String // enrolled | transferred_in | transferred_out | graduated | withdrawn
   changeReason String?
 
   // Audit
-  recordedAt  DateTime @default(now())
-  recordedBy  String?
+  recordedAt DateTime @default(now())
+  recordedBy String?
 
   @@index([userId])
   @@index([schoolId])
@@ -499,44 +499,44 @@ model UserSchoolHistory {
 // =============================================================================
 
 model Demographics {
-  id              String   @id @default(uuid())
-  sourcedId       String   @unique
-  userId          String   @unique
+  id        String @id @default(uuid())
+  sourcedId String @unique
+  userId    String @unique
 
   // Protected fields (FULL_ACCESS only)
-  birthDate       DateTime?
-  sex             String?   // male | female | non-binary | other
+  birthDate DateTime?
+  sex       String? // male | female | non-binary | other
 
   // Race/Ethnicity (FULL_ACCESS only)
-  americanIndianOrAlaskaNative Boolean @default(false)
-  asian                        Boolean @default(false)
-  blackOrAfricanAmerican       Boolean @default(false)
-  hispanicOrLatinoEthnicity    Boolean @default(false)
+  americanIndianOrAlaskaNative         Boolean @default(false)
+  asian                                Boolean @default(false)
+  blackOrAfricanAmerican               Boolean @default(false)
+  hispanicOrLatinoEthnicity            Boolean @default(false)
   nativeHawaiianOrOtherPacificIslander Boolean @default(false)
-  white                        Boolean @default(false)
-  demographicRaceTwoOrMoreRaces Boolean @default(false)
+  white                                Boolean @default(false)
+  demographicRaceTwoOrMoreRaces        Boolean @default(false)
 
   // Program eligibility (SELECTIVE+ only)
-  freeLunchStatus String?   // free | reduced | paid | unknown
+  freeLunchStatus        String? // free | reduced | paid | unknown
   englishLanguageLearner Boolean @default(false)
-  specialEducation Boolean @default(false)
+  specialEducation       Boolean @default(false)
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Sync metadata
-  externalId      String?
-  externalSource  String?
-  lastSyncedAt    DateTime?
-  syncChecksum    String?
-  syncStatus      String   @default("synced")
-  syncError       String?
-  syncVersion     Int      @default(1)
+  externalId     String?
+  externalSource String?
+  lastSyncedAt   DateTime?
+  syncChecksum   String?
+  syncStatus     String    @default("synced")
+  syncError      String?
+  syncVersion    Int       @default(1)
 
   // Relations
-  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([deletedAt])
@@ -547,30 +547,30 @@ model Demographics {
 // =============================================================================
 
 model Vendor {
-  id                String   @id @default(uuid())
-  name              String
-  contactEmail      String   @unique
-  contactName       String
-  website           String?
-  description       String?
+  id           String  @id @default(uuid())
+  name         String
+  contactEmail String  @unique
+  contactName  String
+  website      String?
+  description  String?
 
   // Default access tier for new grants (Mitigation #3)
-  defaultAccessTier String   @default("PRIVACY_SAFE") // PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
-  podsStatus        String   @default("NOT_STARTED")
+  defaultAccessTier String  @default("PRIVACY_SAFE") // PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
+  podsStatus        String  @default("NOT_STARTED")
   podsApplicationId String?
 
   // Standard timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  integrations       IntegrationConfig[]
-  vendorGrants       VendorDataGrant[]
-  ltiDeployments     LtiDeployment[]
-  messageTemplates   MessageTemplate[]
-  messageBatches     MessageBatch[]
-  ssoSessions        SsoSession[]
+  integrations     IntegrationConfig[]
+  vendorGrants     VendorDataGrant[]
+  ltiDeployments   LtiDeployment[]
+  messageTemplates MessageTemplate[]
+  messageBatches   MessageBatch[]
+  ssoSessions      SsoSession[]
 
   @@index([contactEmail])
   @@index([podsStatus])
@@ -579,38 +579,38 @@ model Vendor {
 }
 
 model VendorDataGrant {
-  id              String   @id @default(uuid())
-  vendorId        String
-  districtId      String
+  id         String @id @default(uuid())
+  vendorId   String
+  districtId String
 
   // Access tier - THIS IS THE SOURCE OF TRUTH (Mitigation #3)
-  accessTier      String   @default("PRIVACY_SAFE")
+  accessTier String @default("PRIVACY_SAFE")
 
   // Audit for access tier
-  accessTierApprovedBy   String?
-  accessTierApprovedAt   DateTime?
+  accessTierApprovedBy    String?
+  accessTierApprovedAt    DateTime?
   accessTierJustification String?
 
   // Grant lifecycle: ApprovalStatus (Mitigation #9)
-  status          String   @default("pending_review") // pending_review | approved | rejected | expired | revoked
-  grantedAt       DateTime?
-  expiresAt       DateTime?
+  status    String    @default("pending_review") // pending_review | approved | rejected | expired | revoked
+  grantedAt DateTime?
+  expiresAt DateTime?
 
   // Audit
-  grantedBy       String?
-  revokedBy       String?
-  revokedAt       DateTime?
-  revokeReason    String?
+  grantedBy    String?
+  revokedBy    String?
+  revokedAt    DateTime?
+  revokeReason String?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  district        District @relation(fields: [districtId], references: [id], onDelete: Cascade)
-  schoolGrants    VendorSchoolGrant[]
+  vendor            Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  district          District                 @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  schoolGrants      VendorSchoolGrant[]
   entityPermissions VendorEntityPermission[] // Junction table (Mitigation #5)
 
   @@unique([vendorId, districtId])
@@ -623,41 +623,41 @@ model VendorDataGrant {
 
 // Junction table for entity permissions (Mitigation #5 - no JSON)
 model VendorEntityPermission {
-  id              String   @id @default(uuid())
-  vendorGrantId   String
+  id            String @id @default(uuid())
+  vendorGrantId String
 
   // Which entity type
-  entityType      String   // users | classes | enrollments | orgs | academicSessions | courses | demographics
+  entityType String // users | classes | enrollments | orgs | academicSessions | courses | demographics
 
   // Granular permissions
-  canRead         Boolean  @default(true)
-  canList         Boolean  @default(true)
+  canRead Boolean @default(true)
+  canList Boolean @default(true)
 
   // Field-level restrictions (optional, still JSON but rarely queried)
-  excludedFields  String?
+  excludedFields String?
 
   // Timestamp
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
-  vendorGrant     VendorDataGrant @relation(fields: [vendorGrantId], references: [id], onDelete: Cascade)
+  vendorGrant VendorDataGrant @relation(fields: [vendorGrantId], references: [id], onDelete: Cascade)
 
   @@unique([vendorGrantId, entityType])
   @@index([entityType])
 }
 
 model VendorSchoolGrant {
-  id              String   @id @default(uuid())
-  vendorGrantId   String
-  schoolId        String
+  id            String @id @default(uuid())
+  vendorGrantId String
+  schoolId      String
 
   // Timestamp
-  createdAt       DateTime @default(now())
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
   // Relations
-  vendorGrant     VendorDataGrant @relation(fields: [vendorGrantId], references: [id], onDelete: Cascade)
-  school          School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  vendorGrant VendorDataGrant @relation(fields: [vendorGrantId], references: [id], onDelete: Cascade)
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@unique([vendorGrantId, schoolId])
   @@index([vendorGrantId])
@@ -671,36 +671,36 @@ model VendorSchoolGrant {
 // =============================================================================
 
 model SsoSession {
-  id              String   @id @default(uuid())
-  vendorId        String
-  userId          String
+  id       String @id @default(uuid())
+  vendorId String
+  userId   String
 
   // Session details
-  sessionToken    String   @unique
-  accessToken     String?  // Encrypted
-  refreshToken    String?  // Encrypted
-  idToken         String?
+  sessionToken String  @unique
+  accessToken  String? // Encrypted
+  refreshToken String? // Encrypted
+  idToken      String?
 
   // Provider info
-  ssoProvider     String   // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
-  providerUserId  String?
+  ssoProvider    String // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+  providerUserId String?
 
   // Context
   launchContextId String?
 
   // Lifecycle: EntityStatus
-  status          String   @default("active") // active | expired | revoked
-  expiresAt       DateTime
-  lastActivityAt  DateTime @default(now())
+  status         String   @default("active") // active | expired | revoked
+  expiresAt      DateTime
+  lastActivityAt DateTime @default(now())
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
   // Relations
-  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  launchContext   SsoLaunchContext? @relation(fields: [launchContextId], references: [id])
+  vendor        Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  launchContext SsoLaunchContext? @relation(fields: [launchContextId], references: [id])
 
   @@index([vendorId])
   @@index([userId])
@@ -711,45 +711,45 @@ model SsoSession {
 }
 
 model SsoLaunchContext {
-  id              String   @id @default(uuid())
-  vendorId        String
+  id       String @id @default(uuid())
+  vendorId String
 
   // Context type
-  contextType     String   // class | school | district | resource
-  contextId       String?
+  contextType String // class | school | district | resource
+  contextId   String?
 
   // Additional context
-  returnUrl       String?
-  customParams    String?  // JSON
+  returnUrl    String?
+  customParams String? // JSON
 
   // Timestamp
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
-  sessions        SsoSession[]
+  sessions SsoSession[]
 
   @@index([vendorId])
   @@index([contextType, contextId])
 }
 
 model SsoUserMapping {
-  id              String   @id @default(uuid())
-  userId          String
-  ssoProvider     String   // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
-  providerUserId  String
+  id             String @id @default(uuid())
+  userId         String
+  ssoProvider    String // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+  providerUserId String
 
   // Cached profile data
-  providerEmail   String?
-  providerName    String?
+  providerEmail String?
+  providerName  String?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  lastLoginAt     DateTime?
-  deletedAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+  deletedAt   DateTime?
 
   // Relations
-  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([ssoProvider, providerUserId])
   @@unique([userId, ssoProvider])
@@ -762,35 +762,35 @@ model SsoUserMapping {
 // =============================================================================
 
 model LtiPlatform {
-  id                String   @id @default(uuid())
-  districtId        String
+  id         String @id @default(uuid())
+  districtId String
 
   // Platform identity
-  name              String
-  issuer            String   @unique
-  platformId        String?
+  name       String
+  issuer     String  @unique
+  platformId String?
 
   // OIDC/OAuth endpoints
-  authorizationUrl  String
-  tokenUrl          String
-  jwksUrl           String
+  authorizationUrl String
+  tokenUrl         String
+  jwksUrl          String
 
   // Our keys
-  clientId          String
-  publicKey         String
-  privateKey        String   // Encrypted
+  clientId   String
+  publicKey  String
+  privateKey String // Encrypted
 
   // Status
-  status            String   @default("active")
+  status String @default("active")
 
   // Standard timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  district          District @relation(fields: [districtId], references: [id], onDelete: Cascade)
-  deployments       LtiDeployment[]
+  district    District        @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  deployments LtiDeployment[]
 
   @@index([districtId])
   @@index([issuer])
@@ -798,39 +798,39 @@ model LtiPlatform {
 }
 
 model LtiDeployment {
-  id                String   @id @default(uuid())
-  platformId        String
-  vendorId          String
+  id         String @id @default(uuid())
+  platformId String
+  vendorId   String
 
   // Deployment identity
-  deploymentId      String
+  deploymentId String
 
   // Tool configuration
-  toolName          String
-  toolDescription   String?
-  launchUrl         String
-  deepLinkUrl       String?
-  iconUrl           String?
+  toolName        String
+  toolDescription String?
+  launchUrl       String
+  deepLinkUrl     String?
+  iconUrl         String?
 
   // Capabilities
   supportsDeepLinking Boolean @default(true)
-  supportsGradeSync    Boolean @default(false)
-  supportsNrps         Boolean @default(true)
+  supportsGradeSync   Boolean @default(false)
+  supportsNrps        Boolean @default(true)
 
   // Status
-  status            String   @default("active")
+  status String @default("active")
 
   // Standard timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  platform          LtiPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
-  vendor            Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  resourceLinks     LtiResourceLink[]
-  lineItems         LtiLineItem[]
-  launches          LtiLaunch[]
+  platform      LtiPlatform       @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  vendor        Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  resourceLinks LtiResourceLink[]
+  lineItems     LtiLineItem[]
+  launches      LtiLaunch[]
 
   @@unique([platformId, deploymentId])
   @@index([vendorId])
@@ -839,26 +839,26 @@ model LtiDeployment {
 }
 
 model LtiResourceLink {
-  id                String   @id @default(uuid())
-  deploymentId      String
-  classId           String
+  id           String @id @default(uuid())
+  deploymentId String
+  classId      String
 
   // Resource identity
-  resourceLinkId    String
-  title             String
-  description       String?
+  resourceLinkId String
+  title          String
+  description    String?
 
   // Custom parameters (junction table would be overkill here)
-  customParams      String?  // JSON
+  customParams String? // JSON
 
   // Standard timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
-  class             Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  deployment LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  class      Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([deploymentId, resourceLinkId])
   @@index([classId])
@@ -866,37 +866,37 @@ model LtiResourceLink {
 }
 
 model LtiLineItem {
-  id                String   @id @default(uuid())
-  deploymentId      String
-  classId           String
+  id           String @id @default(uuid())
+  deploymentId String
+  classId      String
 
   // Line item identity
-  lineItemId        String?  // Platform-assigned after creation
-  resourceLinkId    String?
+  lineItemId     String? // Platform-assigned after creation
+  resourceLinkId String?
 
   // Assignment details
-  label             String
-  scoreMaximum      Float
-  tag               String?
+  label        String
+  scoreMaximum Float
+  tag          String?
 
   // Timestamps
-  startDateTime     DateTime?
-  endDateTime       DateTime?
+  startDateTime DateTime?
+  endDateTime   DateTime?
 
   // Sync status: SyncStatus (Mitigation #9)
-  syncStatus        String   @default("pending") // pending | syncing | synced | conflict | error
-  lastSyncAt        DateTime?
-  syncError         String?
+  syncStatus String    @default("pending") // pending | syncing | synced | conflict | error
+  lastSyncAt DateTime?
+  syncError  String?
 
   // Standard timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
-  class             Class @relation(fields: [classId], references: [id], onDelete: Cascade)
-  grades            LtiGrade[]
+  deployment LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  class      Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  grades     LtiGrade[]
 
   @@index([deploymentId])
   @@index([classId])
@@ -905,35 +905,35 @@ model LtiLineItem {
 }
 
 model LtiGrade {
-  id                String   @id @default(uuid())
-  lineItemId        String
-  userId            String
+  id         String @id @default(uuid())
+  lineItemId String
+  userId     String
 
   // Score
-  scoreGiven        Float?
-  scoreMaximum      Float
-  activityProgress  String   @default("Completed") // LtiActivityProgress
-  gradingProgress   String   @default("FullyGraded") // LtiGradingProgress
+  scoreGiven       Float?
+  scoreMaximum     Float
+  activityProgress String @default("Completed") // LtiActivityProgress
+  gradingProgress  String @default("FullyGraded") // LtiGradingProgress
 
   // Comment
-  comment           String?
+  comment String?
 
   // Sync status
-  syncStatus        String   @default("pending")
-  lastSyncAt        DateTime?
-  syncError         String?
+  syncStatus String    @default("pending")
+  lastSyncAt DateTime?
+  syncError  String?
 
   // Standard timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Retention (Mitigation #7)
-  retainUntil       DateTime?
+  retainUntil DateTime?
 
   // Relations
-  lineItem          LtiLineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
-  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lineItem LtiLineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([lineItemId, userId])
   @@index([userId])
@@ -942,30 +942,30 @@ model LtiGrade {
 }
 
 model LtiLaunch {
-  id                String   @id @default(uuid())
-  deploymentId      String
-  userId            String?
+  id           String  @id @default(uuid())
+  deploymentId String
+  userId       String?
 
   // Launch details
-  messageType       String   // LtiResourceLinkRequest | LtiDeepLinkingRequest
-  targetLinkUri     String
-  resourceLinkId    String?
-  contextId         String?
+  messageType    String // LtiResourceLinkRequest | LtiDeepLinkingRequest
+  targetLinkUri  String
+  resourceLinkId String?
+  contextId      String?
 
   // Claims
-  roles             String?  // JSON array
-  customClaims      String?  // JSON
+  roles        String? // JSON array
+  customClaims String? // JSON
 
   // Result
-  status            String   @default("success") // success | error
-  errorMessage      String?
+  status       String  @default("success") // success | error
+  errorMessage String?
 
   // Timestamp
-  launchedAt        DateTime @default(now())
+  launchedAt DateTime @default(now())
 
   // Relations
-  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
-  user              User? @relation(fields: [userId], references: [id])
+  deployment LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  user       User?         @relation(fields: [userId], references: [id])
 
   @@index([deploymentId])
   @@index([userId])
@@ -977,31 +977,31 @@ model LtiLaunch {
 // =============================================================================
 
 model MessageTemplate {
-  id              String   @id @default(uuid())
-  vendorId        String
-  districtId      String?
+  id         String  @id @default(uuid())
+  vendorId   String
+  districtId String?
 
   // Template details
-  name            String
-  channel         String   // EMAIL | SMS | PUSH | IN_APP
-  category        String   // welcome | reminder | alert | announcement
+  name     String
+  channel  String // EMAIL | SMS | PUSH | IN_APP
+  category String // welcome | reminder | alert | announcement
 
   // Content
-  subject         String?
-  bodyTemplate    String
+  subject      String?
+  bodyTemplate String
 
   // Settings
-  isActive        Boolean  @default(true)
+  isActive         Boolean @default(true)
   requiresApproval Boolean @default(false)
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  batches         MessageBatch[]
+  vendor  Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  batches MessageBatch[]
 
   @@unique([vendorId, name])
   @@index([vendorId])
@@ -1012,43 +1012,43 @@ model MessageTemplate {
 }
 
 model ContactPreference {
-  id              String   @id @default(uuid())
-  userId          String   // Parent user ID
-  studentId       String   // Which student
+  id        String @id @default(uuid())
+  userId    String // Parent user ID
+  studentId String // Which student
 
   // Channel preferences
-  emailEnabled    Boolean  @default(true)
-  smsEnabled      Boolean  @default(false)
-  pushEnabled     Boolean  @default(false)
-  inAppEnabled    Boolean  @default(true)
+  emailEnabled Boolean @default(true)
+  smsEnabled   Boolean @default(false)
+  pushEnabled  Boolean @default(false)
+  inAppEnabled Boolean @default(true)
 
   // Verified contact info
-  emailAddress    String?
-  emailVerified   Boolean  @default(false)
-  phoneNumber     String?
-  phoneVerified   Boolean  @default(false)
+  emailAddress  String?
+  emailVerified Boolean @default(false)
+  phoneNumber   String?
+  phoneVerified Boolean @default(false)
 
   // Quiet hours
   quietHoursStart String?
   quietHoursEnd   String?
-  timezone        String   @default("America/Los_Angeles")
+  timezone        String  @default("America/Los_Angeles")
 
   // Language
   preferredLanguage String @default("en")
 
   // Consent
-  consentGivenAt  DateTime?
-  consentMethod   String?
+  consentGivenAt DateTime?
+  consentMethod  String?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  parent          User @relation("ParentPreferences", fields: [userId], references: [id], onDelete: Cascade)
-  student         User @relation("StudentPreferences", fields: [studentId], references: [id], onDelete: Cascade)
-  categoryPrefs   ContactPreferenceCategory[]
+  parent        User                        @relation("ParentPreferences", fields: [userId], references: [id], onDelete: Cascade)
+  student       User                        @relation("StudentPreferences", fields: [studentId], references: [id], onDelete: Cascade)
+  categoryPrefs ContactPreferenceCategory[]
 
   @@unique([userId, studentId])
   @@index([userId])
@@ -1058,59 +1058,59 @@ model ContactPreference {
 
 // Junction table for category preferences (Mitigation #5)
 model ContactPreferenceCategory {
-  id                    String   @id @default(uuid())
-  contactPreferenceId   String
-  category              String   // reminder | alert | announcement | grades | attendance
+  id                  String @id @default(uuid())
+  contactPreferenceId String
+  category            String // reminder | alert | announcement | grades | attendance
 
-  enabled               Boolean  @default(true)
+  enabled Boolean @default(true)
 
   // Relations
-  contactPreference     ContactPreference @relation(fields: [contactPreferenceId], references: [id], onDelete: Cascade)
+  contactPreference ContactPreference @relation(fields: [contactPreferenceId], references: [id], onDelete: Cascade)
 
   @@unique([contactPreferenceId, category])
   @@index([category])
 }
 
 model MessageBatch {
-  id              String   @id @default(uuid())
-  vendorId        String
-  templateId      String?
+  id         String  @id @default(uuid())
+  vendorId   String
+  templateId String?
 
   // Target
-  channel         String
-  recipientType   String   // STUDENT | PARENT | TEACHER
+  channel       String
+  recipientType String // STUDENT | PARENT | TEACHER
 
   // Content
-  subject         String?
-  body            String
+  subject String?
+  body    String
 
   // Schedule
-  scheduledAt     DateTime?
+  scheduledAt DateTime?
 
   // Status: ProcessingStatus (Mitigation #9)
-  status          String   @default("draft") // draft | queued | processing | completed | failed | cancelled
+  status String @default("draft") // draft | queued | processing | completed | failed | cancelled
 
   // Stats
-  totalRecipients Int      @default(0)
-  sentCount       Int      @default(0)
-  deliveredCount  Int      @default(0)
-  failedCount     Int      @default(0)
+  totalRecipients Int @default(0)
+  sentCount       Int @default(0)
+  deliveredCount  Int @default(0)
+  failedCount     Int @default(0)
 
   // Processing
-  startedAt       DateTime?
-  completedAt     DateTime?
-  errorMessage    String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  template        MessageTemplate? @relation(fields: [templateId], references: [id])
-  messages        CommunicationMessage[]
-  targets         MessageBatchTarget[] // Junction table (Mitigation #5)
+  vendor   Vendor                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  template MessageTemplate?       @relation(fields: [templateId], references: [id])
+  messages CommunicationMessage[]
+  targets  MessageBatchTarget[] // Junction table (Mitigation #5)
 
   @@index([vendorId])
   @@index([status])
@@ -1120,51 +1120,51 @@ model MessageBatch {
 
 // Junction table for batch targets (Mitigation #5 - no JSON targetCriteria)
 model MessageBatchTarget {
-  id              String   @id @default(uuid())
-  batchId         String
-  targetType      String   // school | grade | class
-  targetId        String   // School ID, grade level, or class ID
+  id         String @id @default(uuid())
+  batchId    String
+  targetType String // school | grade | class
+  targetId   String // School ID, grade level, or class ID
 
   // Relations
-  batch           MessageBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batch MessageBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@unique([batchId, targetType, targetId])
   @@index([targetType, targetId])
 }
 
 model CommunicationMessage {
-  id              String   @id @default(uuid())
-  vendorId        String
-  batchId         String?
-  userId          String   // Recipient user ID
+  id       String  @id @default(uuid())
+  vendorId String
+  batchId  String?
+  userId   String // Recipient user ID
 
   // Channel & Status
-  channel         String   // EMAIL | SMS | PUSH | IN_APP
-  status          String   @default("queued") // queued | sent | delivered | failed | bounced
+  channel String // EMAIL | SMS | PUSH | IN_APP
+  status  String @default("queued") // queued | sent | delivered | failed | bounced
 
   // Recipient (tokenized for external display)
-  recipientToken  String
-  recipientType   String   // STUDENT | TEACHER | PARENT
+  recipientToken String
+  recipientType  String // STUDENT | TEACHER | PARENT
 
   // Content
-  subject         String?
-  body            String
+  subject String?
+  body    String
 
   // Delivery tracking
-  sentAt          DateTime?
-  deliveredAt     DateTime?
-  failureReason   String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  failureReason String?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
   // Retention (Mitigation #7)
-  retainUntil     DateTime?
+  retainUntil DateTime?
 
   // Relations
-  batch           MessageBatch? @relation(fields: [batchId], references: [id])
-  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batch MessageBatch? @relation(fields: [batchId], references: [id])
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
   @@index([batchId])
@@ -1179,24 +1179,24 @@ model CommunicationMessage {
 // =============================================================================
 
 model PodsApplication {
-  id              String    @id
+  id              String @id
   vendorName      String
   applicationName String
   contactEmail    String
 
   // Status: ApprovalStatus
-  status          String    @default("pending_review")
-  accessTier      String    @default("PRIVACY_SAFE")
+  status     String @default("pending_review")
+  accessTier String @default("PRIVACY_SAFE")
 
   // Timestamps
-  submittedAt     DateTime?
-  reviewedAt      DateTime?
-  expiresAt       DateTime?
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  expiresAt   DateTime?
 
   // Standard timestamps
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([vendorName])
   @@index([contactEmail])
@@ -1209,45 +1209,45 @@ model PodsApplication {
 // =============================================================================
 
 model IntegrationConfig {
-  id                String    @id @default(uuid())
-  vendorId          String
+  id       String @id @default(uuid())
+  vendorId String
 
   // Type & Status: IntegrationStatus
-  type              String    // SSO | ONEROSTER | LTI | COMMUNICATION
-  status            String    @default("not_configured")
+  type   String // SSO | ONEROSTER | LTI | COMMUNICATION
+  status String @default("not_configured")
 
   // SSO-specific
-  ssoProvider       String?
-  ssoClientId       String?
-  ssoClientSecret   String?
-  ssoRedirectUri    String?
+  ssoProvider     String?
+  ssoClientId     String?
+  ssoClientSecret String?
+  ssoRedirectUri  String?
 
   // OneRoster-specific
-  oneRosterVersion  String?
-  oneRosterBaseUrl  String?
+  oneRosterVersion String?
+  oneRosterBaseUrl String?
 
   // LTI-specific
-  ltiVersion        String?
-  ltiClientId       String?
-  ltiDeploymentId   String?
-  ltiJwksUrl        String?
-  ltiAuthUrl        String?
-  ltiTokenUrl       String?
-  ltiLaunchUrl      String?
+  ltiVersion      String?
+  ltiClientId     String?
+  ltiDeploymentId String?
+  ltiJwksUrl      String?
+  ltiAuthUrl      String?
+  ltiTokenUrl     String?
+  ltiLaunchUrl    String?
 
   // Test results
-  configuredAt      DateTime?
-  lastTestedAt      DateTime?
-  testResult        String?
-  errorMessage      String?
+  configuredAt DateTime?
+  lastTestedAt DateTime?
+  testResult   String?
+  errorMessage String?
 
   // Standard timestamps
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Relations
-  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
   @@index([type])
@@ -1260,27 +1260,27 @@ model IntegrationConfig {
 // =============================================================================
 
 model SandboxCredentials {
-  id                 String    @id @default(uuid())
-  vendorId           String    @unique
+  id       String @id @default(uuid())
+  vendorId String @unique
 
   // Credentials
-  apiKey             String    @unique
-  apiSecret          String
-  baseUrl            String
+  apiKey    String @unique
+  apiSecret String
+  baseUrl   String
 
   // Configuration
-  environment        String    @default("sandbox")
-  status             String    @default("active")
-  rateLimitPerMinute Int       @default(60)
+  environment        String @default("sandbox")
+  status             String @default("active")
+  rateLimitPerMinute Int    @default(60)
 
   // Timestamps
-  expiresAt          DateTime
-  lastUsedAt         DateTime?
+  expiresAt  DateTime
+  lastUsedAt DateTime?
 
   // Standard timestamps
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([apiKey])
   @@index([vendorId])
@@ -1293,24 +1293,24 @@ model SandboxCredentials {
 // =============================================================================
 
 model AuditLog {
-  id            String    @id @default(uuid())
-  vendorId      String?
+  id       String  @id @default(uuid())
+  vendorId String?
 
   // Event details
-  action        String
-  resourceType  String
-  resourceId    String?
-  details       String?
+  action       String
+  resourceType String
+  resourceId   String?
+  details      String?
 
   // Request metadata
-  ipAddress     String?
-  userAgent     String?
+  ipAddress String?
+  userAgent String?
 
   // Timestamp
-  timestamp     DateTime  @default(now())
+  timestamp DateTime @default(now())
 
   // Retention
-  retainUntil   DateTime?
+  retainUntil DateTime?
 
   @@index([vendorId])
   @@index([action])
@@ -1323,35 +1323,35 @@ model AuditLog {
 // =============================================================================
 
 model SyncJob {
-  id              String   @id @default(uuid())
-  districtId      String
+  id         String @id @default(uuid())
+  districtId String
 
   // Idempotency (Mitigation #16)
-  idempotencyKey  String   @unique
+  idempotencyKey String @unique
 
   // Job details
-  source          String   // lausd_sis | clever_api | oneroster_csv
-  entityTypes     String   // JSON array
+  source      String // lausd_sis | clever_api | oneroster_csv
+  entityTypes String // JSON array
 
   // Status: ProcessingStatus
-  status          String   @default("pending")
+  status String @default("pending")
 
   // Progress
-  totalRecords    Int      @default(0)
-  processedRecords Int     @default(0)
-  createdRecords  Int      @default(0)
-  updatedRecords  Int      @default(0)
-  errorRecords    Int      @default(0)
+  totalRecords     Int @default(0)
+  processedRecords Int @default(0)
+  createdRecords   Int @default(0)
+  updatedRecords   Int @default(0)
+  errorRecords     Int @default(0)
 
   // Timing
-  startedAt       DateTime?
-  completedAt     DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
 
   // Standard timestamps
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
-  errors          SyncError[]
+  errors SyncError[]
 
   @@index([districtId])
   @@index([status])
@@ -1360,27 +1360,27 @@ model SyncJob {
 }
 
 model SyncError {
-  id              String   @id @default(uuid())
-  syncJobId       String
+  id        String @id @default(uuid())
+  syncJobId String
 
   // Error details
-  entityType      String
-  externalId      String
-  errorType       String   // validation | conflict | missing_ref | unknown
-  errorMessage    String
-  rawData         String?
+  entityType   String
+  externalId   String
+  errorType    String // validation | conflict | missing_ref | unknown
+  errorMessage String
+  rawData      String?
 
   // Resolution
-  resolved        Boolean  @default(false)
-  resolvedAt      DateTime?
-  resolvedBy      String?
-  resolution      String?  // skipped | manual_fix | auto_retry
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  resolution String? // skipped | manual_fix | auto_retry
 
   // Timestamp
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
-  syncJob         SyncJob @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
+  syncJob SyncJob @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
 
   @@index([syncJobId])
   @@index([resolved])
@@ -1391,33 +1391,33 @@ model SyncError {
 // =============================================================================
 
 model ExternalServiceHealth {
-  id              String   @id // clever | classlink | lausd_sis | schoology
+  id String @id // clever | classlink | lausd_sis | schoology
 
   // Current status
-  status          String   @default("healthy") // healthy | degraded | down
+  status String @default("healthy") // healthy | degraded | down
 
   // Health check tracking
-  lastHealthCheck DateTime @default(now())
-  consecutiveFailures Int  @default(0)
-  consecutiveSuccesses Int @default(0)
+  lastHealthCheck      DateTime @default(now())
+  consecutiveFailures  Int      @default(0)
+  consecutiveSuccesses Int      @default(0)
 
   // Failure history
-  lastFailure     DateTime?
+  lastFailure       DateTime?
   lastFailureReason String?
-  lastSuccess     DateTime?
+  lastSuccess       DateTime?
 
   // Circuit breaker state
-  circuitState    String   @default("closed") // closed | open | half_open
-  circuitOpenedAt DateTime?
+  circuitState      String    @default("closed") // closed | open | half_open
+  circuitOpenedAt   DateTime?
   circuitHalfOpenAt DateTime?
 
   // Configuration
-  failureThreshold Int     @default(5)
-  successThreshold Int     @default(3)
-  openDurationMs   Int     @default(60000)
+  failureThreshold Int @default(5)
+  successThreshold Int @default(3)
+  openDurationMs   Int @default(60000)
 
   // Timestamp
-  updatedAt       DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 }
 
 // =============================================================================
@@ -1425,11 +1425,11 @@ model ExternalServiceHealth {
 // =============================================================================
 
 model SchemaMetadata {
-  id              String   @id @default("singleton")
-  version         String   // 1.0.0
-  oneRosterVersion String  // 1.2
-  migratedAt      DateTime @default(now())
+  id               String   @id @default("singleton")
+  version          String // 1.0.0
+  oneRosterVersion String // 1.2
+  migratedAt       DateTime @default(now())
 
   // Feature flags
-  features        String   // JSON: {"lti_grades": true, "demographics": false}
+  features String // JSON: {"lti_grades": true, "demographics": false}
 }

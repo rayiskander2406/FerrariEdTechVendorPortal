@@ -35,10 +35,44 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
 });
 
+/**
+ * Safely try to clear database stores
+ * Returns true if successful, false if database is not available
+ */
+async function safeClearDatabase(): Promise<boolean> {
+  try {
+    await clearAllStores();
+    return true;
+  } catch (error) {
+    // Database cleanup failed - this is OK for file-based tests
+    // that don't need database operations (e.g., HARD-01 config tests)
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('postgresql://') || errorMessage.includes('postgres://') ||
+        errorMessage.includes('Error validating datasource')) {
+      // PostgreSQL/SQLite mismatch - database not available for this test
+      return false;
+    }
+    // Re-throw unexpected errors
+    throw error;
+  }
+}
+
 // Clear all state between tests (before each individual test)
+// Note: clearAllStores may fail for file-based tests that don't need database
+// We catch the error to allow file-only tests to run
 beforeEach(async () => {
-  await clearAllStores();
-  clearSessionPodsSubmissions();
+  const dbAvailable = await safeClearDatabase();
+
+  // Only try to clear PoDS submissions if DB is available
+  // clearSessionPodsSubmissions calls an async function that will fail if DB unavailable
+  if (dbAvailable) {
+    try {
+      clearSessionPodsSubmissions();
+    } catch {
+      // Ignore - database not available
+    }
+  }
+
   localStorageMock.clear();
 });
 

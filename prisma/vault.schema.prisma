@@ -32,18 +32,18 @@ datasource db {
 // =============================================================================
 
 model TokenMapping {
-  token           String   @id       // TKN_STU_XXXXX, TKN_TCH_XXXXX, TKN_PAR_XXXXX
-  realIdentifier  String   @unique   // The actual SIS ID, state ID, etc.
-  identifierType  String             // sis_id | state_id | clever_id | classlink_id
+  token          String @id // TKN_STU_XXXXX, TKN_TCH_XXXXX, TKN_PAR_XXXXX
+  realIdentifier String @unique // The actual SIS ID, state ID, etc.
+  identifierType String // sis_id | state_id | clever_id | classlink_id
 
   // Metadata
-  userRole        String             // student | teacher | parent | administrator
+  userRole String // student | teacher | parent | administrator
 
   // Audit
-  createdAt       DateTime @default(now())
-  createdBy       String?            // Service/user that created this mapping
-  lastAccessedAt  DateTime?
-  accessCount     Int      @default(0)
+  createdAt      DateTime  @default(now())
+  createdBy      String? // Service/user that created this mapping
+  lastAccessedAt DateTime?
+  accessCount    Int       @default(0)
 
   @@index([realIdentifier])
   @@index([identifierType])
@@ -55,21 +55,21 @@ model TokenMapping {
 // =============================================================================
 
 model TokenAccessLog {
-  id              String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // What token was accessed
-  token           String
+  token String
 
   // What operation
-  accessType      String   // tokenize | detokenize | lookup | bulk_tokenize
+  accessType String // tokenize | detokenize | lookup | bulk_tokenize
 
   // Who accessed
-  requestorId     String   // API key ID or service account
-  requestorType   String   // vendor | internal_service | admin | sync_job
-  requestorIp     String
+  requestorId   String // API key ID or service account
+  requestorType String // vendor | internal_service | admin | sync_job
+  requestorIp   String
 
   // Why (REQUIRED for detokenize - Mitigation #19)
-  reason          String?  // Required for detokenize operations
+  reason String? // Required for detokenize operations
 
   // Allowed reasons for detokenization:
   // - sis_sync_reconciliation: Matching records during SIS sync
@@ -80,17 +80,17 @@ model TokenAccessLog {
   // - security_investigation: Security incident investigation
 
   // Context
-  vendorId        String?  // If vendor-initiated
-  resourceContext String?  // What resource this was for
+  vendorId        String? // If vendor-initiated
+  resourceContext String? // What resource this was for
 
   // Outcome
-  success         Boolean
-  errorCode       String?
-  errorMessage    String?
+  success      Boolean
+  errorCode    String?
+  errorMessage String?
 
   // Timing
-  timestamp       DateTime @default(now())
-  durationMs      Int?
+  timestamp  DateTime @default(now())
+  durationMs Int?
 
   @@index([token])
   @@index([requestorId])
@@ -105,19 +105,19 @@ model TokenAccessLog {
 // =============================================================================
 
 model VaultRateLimit {
-  id              String   @id  // Composite: "{requestorId}:{windowStart}"
-  requestorId     String
-  windowStart     DateTime
-  windowEnd       DateTime
+  id          String   @id // Composite: "{requestorId}:{windowStart}"
+  requestorId String
+  windowStart DateTime
+  windowEnd   DateTime
 
   // Counts
-  tokenizeCount   Int      @default(0)
-  detokenizeCount Int      @default(0)
+  tokenizeCount   Int @default(0)
+  detokenizeCount Int @default(0)
 
   // Alerts
-  alertTriggered  Boolean  @default(false)
+  alertTriggered   Boolean   @default(false)
   alertTriggeredAt DateTime?
-  alertType       String?  // rate_exceeded | suspicious_pattern | bulk_attempt
+  alertType        String? // rate_exceeded | suspicious_pattern | bulk_attempt
 
   @@index([requestorId, windowStart])
   @@index([alertTriggered])
@@ -128,30 +128,30 @@ model VaultRateLimit {
 // =============================================================================
 
 model VaultRateLimitConfig {
-  id                  String   @id  // requestor type: vendor | internal_service | admin
+  id String @id // requestor type: vendor | internal_service | admin
 
   // Per-minute limits
-  tokenizePerMinute   Int      @default(100)
-  detokenizePerMinute Int      @default(10)
+  tokenizePerMinute   Int @default(100)
+  detokenizePerMinute Int @default(10)
 
   // Alert thresholds
   tokenizeAlertThreshold   Int @default(500)
   detokenizeAlertThreshold Int @default(50)
 
   // Per-hour limits
-  tokenizePerHour     Int      @default(1000)
-  detokenizePerHour   Int      @default(100)
+  tokenizePerHour   Int @default(1000)
+  detokenizePerHour Int @default(100)
 
   // Per-day limits
-  tokenizePerDay      Int      @default(10000)
-  detokenizePerDay    Int      @default(1000)
+  tokenizePerDay   Int @default(10000)
+  detokenizePerDay Int @default(1000)
 
   // Bulk operations
-  bulkDetokenizeRequiresApproval Boolean @default(true)
-  bulkDetokenizeApprovalThreshold Int    @default(100)
+  bulkDetokenizeRequiresApproval  Boolean @default(true)
+  bulkDetokenizeApprovalThreshold Int     @default(100)
 
   // Timestamp
-  updatedAt           DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 }
 
 // =============================================================================
@@ -159,16 +159,16 @@ model VaultRateLimitConfig {
 // =============================================================================
 
 model DetokenizationApproval {
-  id              String   @id @default(uuid())
-  requestorId     String
+  id          String @id @default(uuid())
+  requestorId String
 
   // Request details
-  requestedCount  Int              // How many tokens to detokenize
-  reason          String           // Why bulk detokenization is needed
-  justification   String           // Detailed justification
+  requestedCount Int // How many tokens to detokenize
+  reason         String // Why bulk detokenization is needed
+  justification  String // Detailed justification
 
   // Approval workflow
-  status          String   @default("pending") // pending | approved | rejected | expired
+  status          String    @default("pending") // pending | approved | rejected | expired
   approvedBy      String?
   approvedAt      DateTime?
   rejectedBy      String?
@@ -176,11 +176,11 @@ model DetokenizationApproval {
   rejectionReason String?
 
   // Usage tracking
-  usedCount       Int      @default(0)
-  expiresAt       DateTime
+  usedCount Int      @default(0)
+  expiresAt DateTime
 
   // Timestamps
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([requestorId])
   @@index([status])
@@ -192,36 +192,36 @@ model DetokenizationApproval {
 // =============================================================================
 
 model SecurityAlert {
-  id              String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Alert details
-  alertType       String   // rate_limit_exceeded | bulk_detokenize_attempt | suspicious_pattern | access_denied
-  severity        String   // low | medium | high | critical
+  alertType String // rate_limit_exceeded | bulk_detokenize_attempt | suspicious_pattern | access_denied
+  severity  String // low | medium | high | critical
 
   // Context
-  requestorId     String
-  requestorType   String
-  requestorIp     String?
+  requestorId   String
+  requestorType String
+  requestorIp   String?
 
   // Details
-  description     String
-  metadata        String?  // JSON: Additional context
+  description String
+  metadata    String? // JSON: Additional context
 
   // What triggered it
-  triggerEvent    String?  // tokenize | detokenize | bulk_operation
-  triggerCount    Int?
+  triggerEvent     String? // tokenize | detokenize | bulk_operation
+  triggerCount     Int?
   triggerThreshold Int?
 
   // Resolution
-  status          String   @default("open") // open | acknowledged | investigating | resolved | false_positive
-  acknowledgedBy  String?
-  acknowledgedAt  DateTime?
-  resolvedBy      String?
-  resolvedAt      DateTime?
-  resolution      String?  // What action was taken
+  status         String    @default("open") // open | acknowledged | investigating | resolved | false_positive
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  resolution     String? // What action was taken
 
   // Timestamp
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([alertType])
   @@index([severity])
