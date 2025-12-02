@@ -50,3 +50,9 @@ next-env.d.ts
 # SQLite development databases
 prisma/*.db
 prisma/prisma/
+
+# Video pitch - exclude generated/large files
+video-pitch/**/node_modules/
+video-pitch/**/output/*.mp4
+video-pitch/**/voiceover/*.mp3
+video-pitch/tts-env/
