@@ -1,39 +1,549 @@
 // =============================================================================
-// LAUSD Vendor Integration Portal - Prisma Schema
+// SchoolDay Vendor Portal - Production Prisma Schema
 // =============================================================================
 //
-// Database: SQLite for development, PostgreSQL for production
-// Configured via DATABASE_URL environment variable
+// Database: PostgreSQL (development and production)
+// All 20 mitigations from SCHEMA_MITIGATION_PLAN.md applied
 //
-// Usage:
-//   Development: DATABASE_URL="file:./dev.db"
-//   Production:  DATABASE_URL="postgresql://..."
+// Key Design Decisions:
+// - Unified User model (students, teachers, parents, admins)
+// - Soft deletes on all entities (deletedAt)
+// - Sync metadata on all syncable entities
+// - Effective dating on relationships
+// - Junction tables instead of JSON arrays
+// - SCD Type 2 for historical queries (UserHistory)
+// - Circuit breaker state for external services
+// - Idempotency keys for sync operations
 //
+// =============================================================================
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // =============================================================================
-// ENUMS (SQLite doesn't support enums, so we use String with validation in code)
+// LAYER 1: DISTRICT HIERARCHY
 // =============================================================================
 
-// AccessTier: PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
-// PodsStatus: NOT_STARTED | IN_PROGRESS | PENDING_REVIEW | APPROVED | REJECTED | EXPIRED
-// SandboxStatus: PROVISIONING | ACTIVE | EXPIRED | REVOKED
-// IntegrationType: SSO | ONEROSTER | LTI | COMMUNICATION
-// IntegrationStatus: NOT_CONFIGURED | CONFIGURING | TESTING | ACTIVE | ERROR | DISABLED
-// SsoProvider: SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
-// CommChannel: EMAIL | SMS | PUSH | IN_APP
-// MessageStatus: QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+model District {
+  id          String   @id @default(uuid())
+  sourcedId   String   @unique
+  name        String
+  shortCode   String   @unique
+  type        String   @default("district") // district | state | national
+
+  // Identifiers
+  ncesId      String?  @unique
+  stateId     String?
+
+  // Metadata
+  timezone    String   @default("America/Los_Angeles")
+  locale      String   @default("en-US")
+
+  // Standard timestamps (Mitigation #11)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete (Mitigation #7)
+
+  // Sync metadata (Mitigation #6)
+  externalId      String?
+  externalSource  String?
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced") // synced | pending | conflict | error
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  schools           School[]
+  academicSessions  AcademicSession[]
+  courses           Course[]
+  vendorGrants      VendorDataGrant[]
+  ltiPlatforms      LtiPlatform[]
+
+  @@index([shortCode])
+  @@index([ncesId])
+  @@index([deletedAt])
+  @@index([externalSource, externalId])
+  @@index([syncStatus])
+}
+
+model School {
+  id          String   @id @default(uuid())
+  sourcedId   String   @unique
+  districtId  String
+
+  // Basic info
+  name        String
+  shortCode   String
+  type        String   // elementary | middle | high | K-8 | K-12
+
+  // Identifiers
+  ncesId      String?  @unique
+  stateId     String?
+
+  // Grade range
+  gradeMin    Int
+  gradeMax    Int
+
+  // Location (public info, not PII)
+  address     String?
+  city        String?
+  state       String?  @default("CA")
+  zipCode     String?
+
+  // Contact (public)
+  phone       String?
+  website     String?
+
+  // Status: EntityStatus (Mitigation #9)
+  status      String   @default("active") // active | inactive | deleted
+
+  // Standard timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Sync metadata
+  externalId      String?
+  externalSource  String?
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced")
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  district           District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  classes            Class[]
+  users              User[] @relation("PrimarySchool")
+  vendorSchoolGrants VendorSchoolGrant[]
+
+  @@unique([districtId, shortCode])
+  @@index([districtId])
+  @@index([ncesId])
+  @@index([type])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([externalSource, externalId])
+}
 
 // =============================================================================
-// VENDOR - Core entity representing an EdTech vendor
+// LAYER 2: ACADEMIC STRUCTURE
+// =============================================================================
+
+model AcademicSession {
+  id          String   @id @default(uuid())
+  sourcedId   String   @unique
+  districtId  String
+
+  // Basic info
+  title       String
+  type        String   // schoolYear | semester | term | gradingPeriod
+
+  // Dates
+  startDate   DateTime
+  endDate     DateTime
+
+  // Hierarchy
+  parentId    String?
+
+  // Status
+  status      String   @default("active")
+
+  // Standard timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Sync metadata
+  externalId      String?
+  externalSource  String?
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced")
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  district    District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  parent      AcademicSession? @relation("SessionHierarchy", fields: [parentId], references: [id])
+  children    AcademicSession[] @relation("SessionHierarchy")
+  classes     Class[]
+
+  @@index([districtId])
+  @@index([type])
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  sourcedId   String   @unique
+  districtId  String
+
+  // Basic info
+  title       String
+  courseCode  String
+
+  // Categorization
+  subject     String?
+  gradeLevel  String?
+
+  // Status
+  status      String   @default("active")
+
+  // Standard timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Sync metadata
+  externalId      String?
+  externalSource  String?
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced")
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  district    District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  classes     Class[]
+
+  @@unique([districtId, courseCode])
+  @@index([districtId])
+  @@index([subject])
+  @@index([deletedAt])
+}
+
+// =============================================================================
+// LAYER 3: CLASSES AND ENROLLMENTS
+// =============================================================================
+
+model Class {
+  id                String   @id @default(uuid())
+  sourcedId         String   @unique
+  schoolId          String
+  courseId          String?
+  academicSessionId String?
+
+  // Basic info
+  title             String
+  classCode         String?
+
+  // Schedule
+  period            String?
+  location          String?
+
+  // Grade/Subject
+  gradeLevel        String?
+  subject           String?
+
+  // Status
+  status            String   @default("active")
+
+  // Standard timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Sync metadata
+  externalId      String?
+  externalSource  String?
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced")
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  school            School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  course            Course? @relation(fields: [courseId], references: [id])
+  academicSession   AcademicSession? @relation(fields: [academicSessionId], references: [id])
+  enrollments       Enrollment[]
+  ltiResourceLinks  LtiResourceLink[]
+  ltiLineItems      LtiLineItem[]
+
+  @@index([schoolId])
+  @@index([courseId])
+  @@index([academicSessionId])
+  @@index([subject])
+  @@index([deletedAt])
+}
+
+model Enrollment {
+  id          String   @id @default(uuid())
+  sourcedId   String   @unique
+  userId      String
+  classId     String
+
+  // Role in class
+  role        String   // student | teacher | aide | administrator
+  isPrimary   Boolean  @default(true)
+
+  // Effective dating (Mitigation #4)
+  effectiveStart  DateTime  @default(now())
+  effectiveEnd    DateTime?
+
+  // Status with history awareness
+  status      String   @default("active") // active | completed | withdrawn | transferred
+
+  // Standard timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  createdBy   String?
+  updatedBy   String?
+
+  // Sync metadata
+  externalId      String?
+  externalSource  String?
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced")
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  class       Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, classId, role, effectiveStart])
+  @@index([userId])
+  @@index([classId])
+  @@index([role])
+  @@index([status])
+  @@index([userId, status])
+  @@index([classId, status])
+  @@index([classId, role])
+  @@index([effectiveStart])
+  @@index([effectiveEnd])
+  @@index([deletedAt])
+}
+
+// =============================================================================
+// LAYER 4: UNIFIED USER MODEL (Mitigation #2)
+// Students, Teachers, Parents, Administrators - all in one table
+// =============================================================================
+
+model User {
+  id              String   @id @default(uuid())
+  sourcedId       String   @unique
+  token           String   @unique // TKN_STU_, TKN_TCH_, TKN_PAR_, TKN_ADM_
+
+  // Identity
+  givenName       String
+  familyName      String
+  middleName      String?
+
+  // Role - includes parents (Mitigation #2)
+  role            String   // student | teacher | parent | administrator | aide
+
+  // School association (null for parents who aren't staff)
+  primarySchoolId String?
+
+  // Contact (real values stored, tokenized on OUTPUT)
+  email           String?
+  phone           String?
+
+  // Status: EntityStatus (Mitigation #9)
+  status          String   @default("active") // active | inactive | deleted
+
+  // Grade (students only)
+  gradeLevel      String?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  deletedBy       String?
+  deletionReason  String? // graduated | transferred | withdrawn | data_request
+
+  // Retention policy (Mitigation #7)
+  retainUntil     DateTime?
+
+  // Sync metadata (Mitigation #6)
+  externalId      String?
+  externalSource  String? // lausd_sis | clever | classlink | oneroster
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced")
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  primarySchool       School? @relation("PrimarySchool", fields: [primarySchoolId], references: [id])
+  enrollments         Enrollment[]
+  demographics        Demographics?
+  childRelationships  UserRelationship[] @relation("ParentRelation")
+  parentRelationships UserRelationship[] @relation("ChildRelation")
+  contactPreferences  ContactPreference[] @relation("ParentPreferences")
+  studentPreferences  ContactPreference[] @relation("StudentPreferences")
+  ssoSessions         SsoSession[]
+  ssoMappings         SsoUserMapping[]
+  ltiGrades           LtiGrade[]
+  ltiLaunches         LtiLaunch[]
+  messages            CommunicationMessage[]
+
+  @@index([primarySchoolId])
+  @@index([token])
+  @@index([role])
+  @@index([status])
+  @@index([gradeLevel])
+  @@index([primarySchoolId, role])
+  @@index([primarySchoolId, role, status])
+  @@index([deletedAt])
+  @@index([externalSource, externalId])
+  @@index([syncStatus])
+  @@index([lastSyncedAt])
+}
+
+// User relationship table (Mitigation #2 - parent-child links)
+model UserRelationship {
+  id              String   @id @default(uuid())
+  parentUserId    String   // User with role='parent'
+  childUserId     String   // User with role='student'
+
+  relationshipType String  // mother | father | guardian | grandparent | other
+  isPrimary       Boolean  @default(false)
+
+  // Permissions
+  canViewGrades      Boolean @default(true)
+  canViewAttendance  Boolean @default(true)
+  canReceiveAlerts   Boolean @default(true)
+  canPickup          Boolean @default(false)
+
+  // Legal
+  hasCustody         Boolean @default(true)
+  legalRestrictions  String?
+
+  // Verification
+  verifiedAt      DateTime?
+  verifiedBy      String?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  parent          User @relation("ParentRelation", fields: [parentUserId], references: [id], onDelete: Cascade)
+  child           User @relation("ChildRelation", fields: [childUserId], references: [id], onDelete: Cascade)
+
+  @@unique([parentUserId, childUserId])
+  @@index([childUserId])
+  @@index([deletedAt])
+}
+
+// User history for SCD Type 2 (Mitigation #15)
+model UserHistory {
+  id              String   @id @default(uuid())
+  userId          String   // Original user ID (not FK - user might be deleted)
+
+  // Snapshot of fields at this point in time
+  givenName       String
+  familyName      String
+  role            String
+  primarySchoolId String?
+  gradeLevel      String?
+  status          String
+
+  // SCD Type 2 fields
+  validFrom       DateTime
+  validTo         DateTime? // null = current record
+  isCurrent       Boolean   @default(true)
+
+  // Change tracking
+  changeReason    String?   // enrollment | transfer | grade_promotion | data_correction
+  changedBy       String?
+
+  // Timestamp
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, isCurrent])
+  @@index([userId, validFrom])
+  @@index([validFrom, validTo])
+}
+
+// User school history for transfers (Mitigation #4)
+model UserSchoolHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  schoolId    String
+
+  // Period at this school
+  startDate   DateTime
+  endDate     DateTime?
+
+  // Reason for change
+  changeType  String   // enrolled | transferred_in | transferred_out | graduated | withdrawn
+  changeReason String?
+
+  // Audit
+  recordedAt  DateTime @default(now())
+  recordedBy  String?
+
+  @@index([userId])
+  @@index([schoolId])
+  @@index([startDate])
+}
+
+// =============================================================================
+// DEMOGRAPHICS - Protected student information
+// =============================================================================
+
+model Demographics {
+  id              String   @id @default(uuid())
+  sourcedId       String   @unique
+  userId          String   @unique
+
+  // Protected fields (FULL_ACCESS only)
+  birthDate       DateTime?
+  sex             String?   // male | female | non-binary | other
+
+  // Race/Ethnicity (FULL_ACCESS only)
+  americanIndianOrAlaskaNative Boolean @default(false)
+  asian                        Boolean @default(false)
+  blackOrAfricanAmerican       Boolean @default(false)
+  hispanicOrLatinoEthnicity    Boolean @default(false)
+  nativeHawaiianOrOtherPacificIslander Boolean @default(false)
+  white                        Boolean @default(false)
+  demographicRaceTwoOrMoreRaces Boolean @default(false)
+
+  // Program eligibility (SELECTIVE+ only)
+  freeLunchStatus String?   // free | reduced | paid | unknown
+  englishLanguageLearner Boolean @default(false)
+  specialEducation Boolean @default(false)
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Sync metadata
+  externalId      String?
+  externalSource  String?
+  lastSyncedAt    DateTime?
+  syncChecksum    String?
+  syncStatus      String   @default("synced")
+  syncError       String?
+  syncVersion     Int      @default(1)
+
+  // Relations
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deletedAt])
+}
+
+// =============================================================================
+// LAYER 5: VENDOR ACCESS SCOPING (Mitigations #3, #5)
 // =============================================================================
 
 model Vendor {
@@ -44,27 +554,628 @@ model Vendor {
   website           String?
   description       String?
 
-  // Access & Status
-  accessTier        String   @default("PRIVACY_SAFE") // PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
-  podsStatus        String   @default("NOT_STARTED")  // NOT_STARTED | IN_PROGRESS | PENDING_REVIEW | APPROVED | REJECTED | EXPIRED
+  // Default access tier for new grants (Mitigation #3)
+  defaultAccessTier String   @default("PRIVACY_SAFE") // PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
+  podsStatus        String   @default("NOT_STARTED")
   podsApplicationId String?
 
-  // Timestamps
+  // Standard timestamps
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
 
   // Relations
   integrations       IntegrationConfig[]
-  // Note: sandboxCredentials, auditLogs, and messages removed - they reference vendorId without FK constraint
-  // This allows test isolation and prevents FK violations during testing
+  vendorGrants       VendorDataGrant[]
+  ltiDeployments     LtiDeployment[]
+  messageTemplates   MessageTemplate[]
+  messageBatches     MessageBatch[]
+  ssoSessions        SsoSession[]
 
   @@index([contactEmail])
   @@index([podsStatus])
-  @@index([accessTier])
+  @@index([defaultAccessTier])
+  @@index([deletedAt])
+}
+
+model VendorDataGrant {
+  id              String   @id @default(uuid())
+  vendorId        String
+  districtId      String
+
+  // Access tier - THIS IS THE SOURCE OF TRUTH (Mitigation #3)
+  accessTier      String   @default("PRIVACY_SAFE")
+
+  // Audit for access tier
+  accessTierApprovedBy   String?
+  accessTierApprovedAt   DateTime?
+  accessTierJustification String?
+
+  // Grant lifecycle: ApprovalStatus (Mitigation #9)
+  status          String   @default("pending_review") // pending_review | approved | rejected | expired | revoked
+  grantedAt       DateTime?
+  expiresAt       DateTime?
+
+  // Audit
+  grantedBy       String?
+  revokedBy       String?
+  revokedAt       DateTime?
+  revokeReason    String?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  district        District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  schoolGrants    VendorSchoolGrant[]
+  entityPermissions VendorEntityPermission[] // Junction table (Mitigation #5)
+
+  @@unique([vendorId, districtId])
+  @@index([vendorId])
+  @@index([districtId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([deletedAt])
+}
+
+// Junction table for entity permissions (Mitigation #5 - no JSON)
+model VendorEntityPermission {
+  id              String   @id @default(uuid())
+  vendorGrantId   String
+
+  // Which entity type
+  entityType      String   // users | classes | enrollments | orgs | academicSessions | courses | demographics
+
+  // Granular permissions
+  canRead         Boolean  @default(true)
+  canList         Boolean  @default(true)
+
+  // Field-level restrictions (optional, still JSON but rarely queried)
+  excludedFields  String?
+
+  // Timestamp
+  createdAt       DateTime @default(now())
+
+  // Relations
+  vendorGrant     VendorDataGrant @relation(fields: [vendorGrantId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorGrantId, entityType])
+  @@index([entityType])
+}
+
+model VendorSchoolGrant {
+  id              String   @id @default(uuid())
+  vendorGrantId   String
+  schoolId        String
+
+  // Timestamp
+  createdAt       DateTime @default(now())
+  deletedAt       DateTime?
+
+  // Relations
+  vendorGrant     VendorDataGrant @relation(fields: [vendorGrantId], references: [id], onDelete: Cascade)
+  school          School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorGrantId, schoolId])
+  @@index([vendorGrantId])
+  @@index([schoolId])
+  @@index([schoolId, vendorGrantId])
+  @@index([deletedAt])
 }
 
 // =============================================================================
-// PODS APPLICATION - PoDS-Lite application records
+// LAYER 6: SSO INTEGRATION
+// =============================================================================
+
+model SsoSession {
+  id              String   @id @default(uuid())
+  vendorId        String
+  userId          String
+
+  // Session details
+  sessionToken    String   @unique
+  accessToken     String?  // Encrypted
+  refreshToken    String?  // Encrypted
+  idToken         String?
+
+  // Provider info
+  ssoProvider     String   // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+  providerUserId  String?
+
+  // Context
+  launchContextId String?
+
+  // Lifecycle: EntityStatus
+  status          String   @default("active") // active | expired | revoked
+  expiresAt       DateTime
+  lastActivityAt  DateTime @default(now())
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  deletedAt       DateTime?
+
+  // Relations
+  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  launchContext   SsoLaunchContext? @relation(fields: [launchContextId], references: [id])
+
+  @@index([vendorId])
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([deletedAt])
+}
+
+model SsoLaunchContext {
+  id              String   @id @default(uuid())
+  vendorId        String
+
+  // Context type
+  contextType     String   // class | school | district | resource
+  contextId       String?
+
+  // Additional context
+  returnUrl       String?
+  customParams    String?  // JSON
+
+  // Timestamp
+  createdAt       DateTime @default(now())
+
+  // Relations
+  sessions        SsoSession[]
+
+  @@index([vendorId])
+  @@index([contextType, contextId])
+}
+
+model SsoUserMapping {
+  id              String   @id @default(uuid())
+  userId          String
+  ssoProvider     String   // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
+  providerUserId  String
+
+  // Cached profile data
+  providerEmail   String?
+  providerName    String?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastLoginAt     DateTime?
+  deletedAt       DateTime?
+
+  // Relations
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ssoProvider, providerUserId])
+  @@unique([userId, ssoProvider])
+  @@index([userId])
+  @@index([deletedAt])
+}
+
+// =============================================================================
+// LAYER 7: LTI 1.3 INTEGRATION
+// =============================================================================
+
+model LtiPlatform {
+  id                String   @id @default(uuid())
+  districtId        String
+
+  // Platform identity
+  name              String
+  issuer            String   @unique
+  platformId        String?
+
+  // OIDC/OAuth endpoints
+  authorizationUrl  String
+  tokenUrl          String
+  jwksUrl           String
+
+  // Our keys
+  clientId          String
+  publicKey         String
+  privateKey        String   // Encrypted
+
+  // Status
+  status            String   @default("active")
+
+  // Standard timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  district          District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  deployments       LtiDeployment[]
+
+  @@index([districtId])
+  @@index([issuer])
+  @@index([deletedAt])
+}
+
+model LtiDeployment {
+  id                String   @id @default(uuid())
+  platformId        String
+  vendorId          String
+
+  // Deployment identity
+  deploymentId      String
+
+  // Tool configuration
+  toolName          String
+  toolDescription   String?
+  launchUrl         String
+  deepLinkUrl       String?
+  iconUrl           String?
+
+  // Capabilities
+  supportsDeepLinking Boolean @default(true)
+  supportsGradeSync    Boolean @default(false)
+  supportsNrps         Boolean @default(true)
+
+  // Status
+  status            String   @default("active")
+
+  // Standard timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  platform          LtiPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  vendor            Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  resourceLinks     LtiResourceLink[]
+  lineItems         LtiLineItem[]
+  launches          LtiLaunch[]
+
+  @@unique([platformId, deploymentId])
+  @@index([vendorId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model LtiResourceLink {
+  id                String   @id @default(uuid())
+  deploymentId      String
+  classId           String
+
+  // Resource identity
+  resourceLinkId    String
+  title             String
+  description       String?
+
+  // Custom parameters (junction table would be overkill here)
+  customParams      String?  // JSON
+
+  // Standard timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  class             Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([deploymentId, resourceLinkId])
+  @@index([classId])
+  @@index([deletedAt])
+}
+
+model LtiLineItem {
+  id                String   @id @default(uuid())
+  deploymentId      String
+  classId           String
+
+  // Line item identity
+  lineItemId        String?  // Platform-assigned after creation
+  resourceLinkId    String?
+
+  // Assignment details
+  label             String
+  scoreMaximum      Float
+  tag               String?
+
+  // Timestamps
+  startDateTime     DateTime?
+  endDateTime       DateTime?
+
+  // Sync status: SyncStatus (Mitigation #9)
+  syncStatus        String   @default("pending") // pending | syncing | synced | conflict | error
+  lastSyncAt        DateTime?
+  syncError         String?
+
+  // Standard timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  class             Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  grades            LtiGrade[]
+
+  @@index([deploymentId])
+  @@index([classId])
+  @@index([syncStatus])
+  @@index([deletedAt])
+}
+
+model LtiGrade {
+  id                String   @id @default(uuid())
+  lineItemId        String
+  userId            String
+
+  // Score
+  scoreGiven        Float?
+  scoreMaximum      Float
+  activityProgress  String   @default("Completed") // LtiActivityProgress
+  gradingProgress   String   @default("FullyGraded") // LtiGradingProgress
+
+  // Comment
+  comment           String?
+
+  // Sync status
+  syncStatus        String   @default("pending")
+  lastSyncAt        DateTime?
+  syncError         String?
+
+  // Standard timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Retention (Mitigation #7)
+  retainUntil       DateTime?
+
+  // Relations
+  lineItem          LtiLineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([lineItemId, userId])
+  @@index([userId])
+  @@index([syncStatus])
+  @@index([deletedAt])
+}
+
+model LtiLaunch {
+  id                String   @id @default(uuid())
+  deploymentId      String
+  userId            String?
+
+  // Launch details
+  messageType       String   // LtiResourceLinkRequest | LtiDeepLinkingRequest
+  targetLinkUri     String
+  resourceLinkId    String?
+  contextId         String?
+
+  // Claims
+  roles             String?  // JSON array
+  customClaims      String?  // JSON
+
+  // Result
+  status            String   @default("success") // success | error
+  errorMessage      String?
+
+  // Timestamp
+  launchedAt        DateTime @default(now())
+
+  // Relations
+  deployment        LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  user              User? @relation(fields: [userId], references: [id])
+
+  @@index([deploymentId])
+  @@index([userId])
+  @@index([launchedAt])
+}
+
+// =============================================================================
+// LAYER 8: CPaaS COMMUNICATION
+// =============================================================================
+
+model MessageTemplate {
+  id              String   @id @default(uuid())
+  vendorId        String
+  districtId      String?
+
+  // Template details
+  name            String
+  channel         String   // EMAIL | SMS | PUSH | IN_APP
+  category        String   // welcome | reminder | alert | announcement
+
+  // Content
+  subject         String?
+  bodyTemplate    String
+
+  // Settings
+  isActive        Boolean  @default(true)
+  requiresApproval Boolean @default(false)
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  batches         MessageBatch[]
+
+  @@unique([vendorId, name])
+  @@index([vendorId])
+  @@index([districtId])
+  @@index([channel])
+  @@index([category])
+  @@index([deletedAt])
+}
+
+model ContactPreference {
+  id              String   @id @default(uuid())
+  userId          String   // Parent user ID
+  studentId       String   // Which student
+
+  // Channel preferences
+  emailEnabled    Boolean  @default(true)
+  smsEnabled      Boolean  @default(false)
+  pushEnabled     Boolean  @default(false)
+  inAppEnabled    Boolean  @default(true)
+
+  // Verified contact info
+  emailAddress    String?
+  emailVerified   Boolean  @default(false)
+  phoneNumber     String?
+  phoneVerified   Boolean  @default(false)
+
+  // Quiet hours
+  quietHoursStart String?
+  quietHoursEnd   String?
+  timezone        String   @default("America/Los_Angeles")
+
+  // Language
+  preferredLanguage String @default("en")
+
+  // Consent
+  consentGivenAt  DateTime?
+  consentMethod   String?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  parent          User @relation("ParentPreferences", fields: [userId], references: [id], onDelete: Cascade)
+  student         User @relation("StudentPreferences", fields: [studentId], references: [id], onDelete: Cascade)
+  categoryPrefs   ContactPreferenceCategory[]
+
+  @@unique([userId, studentId])
+  @@index([userId])
+  @@index([studentId])
+  @@index([deletedAt])
+}
+
+// Junction table for category preferences (Mitigation #5)
+model ContactPreferenceCategory {
+  id                    String   @id @default(uuid())
+  contactPreferenceId   String
+  category              String   // reminder | alert | announcement | grades | attendance
+
+  enabled               Boolean  @default(true)
+
+  // Relations
+  contactPreference     ContactPreference @relation(fields: [contactPreferenceId], references: [id], onDelete: Cascade)
+
+  @@unique([contactPreferenceId, category])
+  @@index([category])
+}
+
+model MessageBatch {
+  id              String   @id @default(uuid())
+  vendorId        String
+  templateId      String?
+
+  // Target
+  channel         String
+  recipientType   String   // STUDENT | PARENT | TEACHER
+
+  // Content
+  subject         String?
+  body            String
+
+  // Schedule
+  scheduledAt     DateTime?
+
+  // Status: ProcessingStatus (Mitigation #9)
+  status          String   @default("draft") // draft | queued | processing | completed | failed | cancelled
+
+  // Stats
+  totalRecipients Int      @default(0)
+  sentCount       Int      @default(0)
+  deliveredCount  Int      @default(0)
+  failedCount     Int      @default(0)
+
+  // Processing
+  startedAt       DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  vendor          Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  template        MessageTemplate? @relation(fields: [templateId], references: [id])
+  messages        CommunicationMessage[]
+  targets         MessageBatchTarget[] // Junction table (Mitigation #5)
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([deletedAt])
+}
+
+// Junction table for batch targets (Mitigation #5 - no JSON targetCriteria)
+model MessageBatchTarget {
+  id              String   @id @default(uuid())
+  batchId         String
+  targetType      String   // school | grade | class
+  targetId        String   // School ID, grade level, or class ID
+
+  // Relations
+  batch           MessageBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, targetType, targetId])
+  @@index([targetType, targetId])
+}
+
+model CommunicationMessage {
+  id              String   @id @default(uuid())
+  vendorId        String
+  batchId         String?
+  userId          String   // Recipient user ID
+
+  // Channel & Status
+  channel         String   // EMAIL | SMS | PUSH | IN_APP
+  status          String   @default("queued") // queued | sent | delivered | failed | bounced
+
+  // Recipient (tokenized for external display)
+  recipientToken  String
+  recipientType   String   // STUDENT | TEACHER | PARENT
+
+  // Content
+  subject         String?
+  body            String
+
+  // Delivery tracking
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  failureReason   String?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+  deletedAt       DateTime?
+
+  // Retention (Mitigation #7)
+  retainUntil     DateTime?
+
+  // Relations
+  batch           MessageBatch? @relation(fields: [batchId], references: [id])
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([batchId])
+  @@index([userId])
+  @@index([status])
+  @@index([channel])
+  @@index([deletedAt])
+}
+
+// =============================================================================
+// PODS APPLICATION
 // =============================================================================
 
 model PodsApplication {
@@ -73,22 +1184,79 @@ model PodsApplication {
   applicationName String
   contactEmail    String
 
-  // Status
-  status          String    @default("PENDING_REVIEW") // NOT_STARTED | IN_PROGRESS | PENDING_REVIEW | APPROVED | REJECTED | EXPIRED
-  accessTier      String    @default("PRIVACY_SAFE")   // PRIVACY_SAFE | SELECTIVE | FULL_ACCESS
+  // Status: ApprovalStatus
+  status          String    @default("pending_review")
+  accessTier      String    @default("PRIVACY_SAFE")
 
   // Timestamps
   submittedAt     DateTime?
   reviewedAt      DateTime?
   expiresAt       DateTime?
 
+  // Standard timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
   @@index([vendorName])
   @@index([contactEmail])
   @@index([status])
+  @@index([deletedAt])
 }
 
 // =============================================================================
-// SANDBOX CREDENTIALS - API credentials for OneRoster access
+// INTEGRATION CONFIG (existing, enhanced)
+// =============================================================================
+
+model IntegrationConfig {
+  id                String    @id @default(uuid())
+  vendorId          String
+
+  // Type & Status: IntegrationStatus
+  type              String    // SSO | ONEROSTER | LTI | COMMUNICATION
+  status            String    @default("not_configured")
+
+  // SSO-specific
+  ssoProvider       String?
+  ssoClientId       String?
+  ssoClientSecret   String?
+  ssoRedirectUri    String?
+
+  // OneRoster-specific
+  oneRosterVersion  String?
+  oneRosterBaseUrl  String?
+
+  // LTI-specific
+  ltiVersion        String?
+  ltiClientId       String?
+  ltiDeploymentId   String?
+  ltiJwksUrl        String?
+  ltiAuthUrl        String?
+  ltiTokenUrl       String?
+  ltiLaunchUrl      String?
+
+  // Test results
+  configuredAt      DateTime?
+  lastTestedAt      DateTime?
+  testResult        String?
+  errorMessage      String?
+
+  // Standard timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([type])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// =============================================================================
+// SANDBOX CREDENTIALS
 // =============================================================================
 
 model SandboxCredentials {
@@ -101,85 +1269,38 @@ model SandboxCredentials {
   baseUrl            String
 
   // Configuration
-  environment        String    @default("sandbox") // sandbox | production
-  status             String    @default("ACTIVE")  // PROVISIONING | ACTIVE | EXPIRED | REVOKED
+  environment        String    @default("sandbox")
+  status             String    @default("active")
   rateLimitPerMinute Int       @default(60)
-  allowedEndpoints   String    // JSON array stored as string (SQLite limitation)
 
   // Timestamps
   expiresAt          DateTime
-  createdAt          DateTime  @default(now())
   lastUsedAt         DateTime?
 
-  // Note: No FK constraint - allows test isolation and prevents FK violations during testing
+  // Standard timestamps
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
 
   @@index([apiKey])
   @@index([vendorId])
   @@index([status])
+  @@index([deletedAt])
 }
 
 // =============================================================================
-// INTEGRATION CONFIG - SSO, LTI, OneRoster configurations
-// =============================================================================
-
-model IntegrationConfig {
-  id                String    @id @default(uuid())
-  vendorId          String
-
-  // Type & Status
-  type              String    // SSO | ONEROSTER | LTI | COMMUNICATION
-  status            String    @default("NOT_CONFIGURED") // NOT_CONFIGURED | CONFIGURING | TESTING | ACTIVE | ERROR | DISABLED
-
-  // SSO-specific fields
-  ssoProvider       String?   // SCHOOLDAY | CLEVER | CLASSLINK | GOOGLE
-  ssoClientId       String?
-  ssoClientSecret   String?
-  ssoRedirectUri    String?
-
-  // OneRoster-specific fields
-  oneRosterVersion  String?   // 1.1 | 1.2
-  oneRosterBaseUrl  String?
-
-  // LTI-specific fields
-  ltiVersion        String?   // 1.3
-  ltiClientId       String?
-  ltiDeploymentId   String?
-  ltiJwksUrl        String?
-  ltiAuthUrl        String?
-  ltiTokenUrl       String?
-  ltiLaunchUrl      String?
-
-  // Test results
-  configuredAt      DateTime?
-  lastTestedAt      DateTime?
-  testResult        String?   // PASS | FAIL | PENDING
-  errorMessage      String?
-
-  // Timestamps
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // Relations
-  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-
-  @@index([vendorId])
-  @@index([type])
-  @@index([status])
-}
-
-// =============================================================================
-// AUDIT LOG - Comprehensive audit trail
+// AUDIT LOG
 // =============================================================================
 
 model AuditLog {
   id            String    @id @default(uuid())
-  vendorId      String    // Note: No FK constraint - audit logs can reference non-existent vendors
+  vendorId      String?
 
   // Event details
-  action        String    // e.g., VENDOR_CREATED, SANDBOX_CREATED, SSO_CONFIGURED
-  resourceType  String    // vendor | sandbox | sso | pods_application | etc.
+  action        String
+  resourceType  String
   resourceId    String?
-  details       String?   // JSON stored as string (SQLite limitation)
+  details       String?
 
   // Request metadata
   ipAddress     String?
@@ -188,8 +1309,8 @@ model AuditLog {
   // Timestamp
   timestamp     DateTime  @default(now())
 
-  // Note: Removed vendor relation to allow audit logs without strict FK constraint
-  // This enables logging events before/during vendor creation and system-level events
+  // Retention
+  retainUntil   DateTime?
 
   @@index([vendorId])
   @@index([action])
@@ -198,36 +1319,117 @@ model AuditLog {
 }
 
 // =============================================================================
-// COMMUNICATION MESSAGE - Test messages via CPaaS
+// SYNC INFRASTRUCTURE (Mitigation #6, #16)
 // =============================================================================
 
-model CommunicationMessage {
-  id              String    @id @default(uuid())
-  vendorId        String
+model SyncJob {
+  id              String   @id @default(uuid())
+  districtId      String
 
-  // Channel & Status
-  channel         String    // EMAIL | SMS | PUSH | IN_APP
-  status          String    @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+  // Idempotency (Mitigation #16)
+  idempotencyKey  String   @unique
 
-  // Recipient (tokenized)
-  recipientToken  String    // e.g., TKN_STU_8X9Y2Z or TKN_PAR_xxx
-  recipientType   String    // STUDENT | TEACHER | PARENT
+  // Job details
+  source          String   // lausd_sis | clever_api | oneroster_csv
+  entityTypes     String   // JSON array
 
-  // Content
-  subject         String?   // For email
-  body            String
+  // Status: ProcessingStatus
+  status          String   @default("pending")
 
-  // Delivery tracking
-  sentAt          DateTime?
-  deliveredAt     DateTime?
-  failureReason   String?
+  // Progress
+  totalRecords    Int      @default(0)
+  processedRecords Int     @default(0)
+  createdRecords  Int      @default(0)
+  updatedRecords  Int      @default(0)
+  errorRecords    Int      @default(0)
+
+  // Timing
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  // Standard timestamps
+  createdAt       DateTime @default(now())
+
+  // Relations
+  errors          SyncError[]
+
+  @@index([districtId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([idempotencyKey])
+}
+
+model SyncError {
+  id              String   @id @default(uuid())
+  syncJobId       String
+
+  // Error details
+  entityType      String
+  externalId      String
+  errorType       String   // validation | conflict | missing_ref | unknown
+  errorMessage    String
+  rawData         String?
+
+  // Resolution
+  resolved        Boolean  @default(false)
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  resolution      String?  // skipped | manual_fix | auto_retry
 
   // Timestamp
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime @default(now())
 
-  // Note: No FK constraint - allows test isolation and prevents FK violations during testing
+  // Relations
+  syncJob         SyncJob @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
 
-  @@index([vendorId])
-  @@index([status])
-  @@index([channel])
+  @@index([syncJobId])
+  @@index([resolved])
+}
+
+// =============================================================================
+// EXTERNAL SERVICE HEALTH / CIRCUIT BREAKER (Mitigation #17)
+// =============================================================================
+
+model ExternalServiceHealth {
+  id              String   @id // clever | classlink | lausd_sis | schoology
+
+  // Current status
+  status          String   @default("healthy") // healthy | degraded | down
+
+  // Health check tracking
+  lastHealthCheck DateTime @default(now())
+  consecutiveFailures Int  @default(0)
+  consecutiveSuccesses Int @default(0)
+
+  // Failure history
+  lastFailure     DateTime?
+  lastFailureReason String?
+  lastSuccess     DateTime?
+
+  // Circuit breaker state
+  circuitState    String   @default("closed") // closed | open | half_open
+  circuitOpenedAt DateTime?
+  circuitHalfOpenAt DateTime?
+
+  // Configuration
+  failureThreshold Int     @default(5)
+  successThreshold Int     @default(3)
+  openDurationMs   Int     @default(60000)
+
+  // Timestamp
+  updatedAt       DateTime @updatedAt
+}
+
+// =============================================================================
+// SCHEMA VERSIONING (Mitigation #14)
+// =============================================================================
+
+model SchemaMetadata {
+  id              String   @id @default("singleton")
+  version         String   // 1.0.0
+  oneRosterVersion String  // 1.2
+  migratedAt      DateTime @default(now())
+
+  // Feature flags
+  features        String   // JSON: {"lti_grades": true, "demographics": false}
 }

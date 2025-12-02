@@ -1,0 +1,231 @@
+// =============================================================================
+// SchoolDay Vendor Portal - Token Vault Schema (SEPARATE DATABASE)
+// =============================================================================
+//
+// SECURITY: This schema runs in a SEPARATE, hardened database with:
+// - Different access credentials than main database
+// - Enhanced encryption (AES-256)
+// - Limited network access (not accessible from app servers directly)
+// - All access logged to immutable audit trail
+// - Rate limiting to prevent bulk extraction
+//
+// Mitigations addressed:
+// - #8:  Token security (separate vault)
+// - #18: Token access logging
+// - #19: Detokenization reason requirement
+// - #20: Vault rate limiting
+//
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/vault-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("VAULT_DATABASE_URL")
+}
+
+// =============================================================================
+// TOKEN MAPPING - Maps tokens to real identifiers
+// =============================================================================
+
+model TokenMapping {
+  token           String   @id       // TKN_STU_XXXXX, TKN_TCH_XXXXX, TKN_PAR_XXXXX
+  realIdentifier  String   @unique   // The actual SIS ID, state ID, etc.
+  identifierType  String             // sis_id | state_id | clever_id | classlink_id
+
+  // Metadata
+  userRole        String             // student | teacher | parent | administrator
+
+  // Audit
+  createdAt       DateTime @default(now())
+  createdBy       String?            // Service/user that created this mapping
+  lastAccessedAt  DateTime?
+  accessCount     Int      @default(0)
+
+  @@index([realIdentifier])
+  @@index([identifierType])
+  @@index([userRole])
+}
+
+// =============================================================================
+// TOKEN ACCESS LOG - Immutable audit trail (Mitigation #18)
+// =============================================================================
+
+model TokenAccessLog {
+  id              String   @id @default(uuid())
+
+  // What token was accessed
+  token           String
+
+  // What operation
+  accessType      String   // tokenize | detokenize | lookup | bulk_tokenize
+
+  // Who accessed
+  requestorId     String   // API key ID or service account
+  requestorType   String   // vendor | internal_service | admin | sync_job
+  requestorIp     String
+
+  // Why (REQUIRED for detokenize - Mitigation #19)
+  reason          String?  // Required for detokenize operations
+
+  // Allowed reasons for detokenization:
+  // - sis_sync_reconciliation: Matching records during SIS sync
+  // - compliance_audit: FERPA/SOPIPA compliance audit
+  // - data_subject_request: GDPR/CCPA data request
+  // - emergency_contact: Emergency situation requiring contact
+  // - legal_subpoena: Legal requirement
+  // - security_investigation: Security incident investigation
+
+  // Context
+  vendorId        String?  // If vendor-initiated
+  resourceContext String?  // What resource this was for
+
+  // Outcome
+  success         Boolean
+  errorCode       String?
+  errorMessage    String?
+
+  // Timing
+  timestamp       DateTime @default(now())
+  durationMs      Int?
+
+  @@index([token])
+  @@index([requestorId])
+  @@index([timestamp])
+  @@index([accessType])
+  @@index([success])
+  @@index([vendorId])
+}
+
+// =============================================================================
+// VAULT RATE LIMIT - Prevent bulk extraction (Mitigation #20)
+// =============================================================================
+
+model VaultRateLimit {
+  id              String   @id  // Composite: "{requestorId}:{windowStart}"
+  requestorId     String
+  windowStart     DateTime
+  windowEnd       DateTime
+
+  // Counts
+  tokenizeCount   Int      @default(0)
+  detokenizeCount Int      @default(0)
+
+  // Alerts
+  alertTriggered  Boolean  @default(false)
+  alertTriggeredAt DateTime?
+  alertType       String?  // rate_exceeded | suspicious_pattern | bulk_attempt
+
+  @@index([requestorId, windowStart])
+  @@index([alertTriggered])
+}
+
+// =============================================================================
+// RATE LIMIT CONFIG - Configurable limits per requestor type
+// =============================================================================
+
+model VaultRateLimitConfig {
+  id                  String   @id  // requestor type: vendor | internal_service | admin
+
+  // Per-minute limits
+  tokenizePerMinute   Int      @default(100)
+  detokenizePerMinute Int      @default(10)
+
+  // Alert thresholds
+  tokenizeAlertThreshold   Int @default(500)
+  detokenizeAlertThreshold Int @default(50)
+
+  // Per-hour limits
+  tokenizePerHour     Int      @default(1000)
+  detokenizePerHour   Int      @default(100)
+
+  // Per-day limits
+  tokenizePerDay      Int      @default(10000)
+  detokenizePerDay    Int      @default(1000)
+
+  // Bulk operations
+  bulkDetokenizeRequiresApproval Boolean @default(true)
+  bulkDetokenizeApprovalThreshold Int    @default(100)
+
+  // Timestamp
+  updatedAt           DateTime @updatedAt
+}
+
+// =============================================================================
+// DETOKENIZATION APPROVAL - Pre-approval for bulk operations
+// =============================================================================
+
+model DetokenizationApproval {
+  id              String   @id @default(uuid())
+  requestorId     String
+
+  // Request details
+  requestedCount  Int              // How many tokens to detokenize
+  reason          String           // Why bulk detokenization is needed
+  justification   String           // Detailed justification
+
+  // Approval workflow
+  status          String   @default("pending") // pending | approved | rejected | expired
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectedBy      String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  // Usage tracking
+  usedCount       Int      @default(0)
+  expiresAt       DateTime
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+
+  @@index([requestorId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// SECURITY ALERT - Triggered when suspicious activity detected
+// =============================================================================
+
+model SecurityAlert {
+  id              String   @id @default(uuid())
+
+  // Alert details
+  alertType       String   // rate_limit_exceeded | bulk_detokenize_attempt | suspicious_pattern | access_denied
+  severity        String   // low | medium | high | critical
+
+  // Context
+  requestorId     String
+  requestorType   String
+  requestorIp     String?
+
+  // Details
+  description     String
+  metadata        String?  // JSON: Additional context
+
+  // What triggered it
+  triggerEvent    String?  // tokenize | detokenize | bulk_operation
+  triggerCount    Int?
+  triggerThreshold Int?
+
+  // Resolution
+  status          String   @default("open") // open | acknowledged | investigating | resolved | false_positive
+  acknowledgedBy  String?
+  acknowledgedAt  DateTime?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  resolution      String?  // What action was taken
+
+  // Timestamp
+  createdAt       DateTime @default(now())
+
+  @@index([alertType])
+  @@index([severity])
+  @@index([status])
+  @@index([requestorId])
+  @@index([createdAt])
+}

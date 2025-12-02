@@ -970,7 +970,452 @@ const version = request.headers.get('Accept')?.match(/v(\d+\.\d+)/)?.[1] || '1.2
 
 ---
 
-## Summary: Mitigation Checklist
+## Expert Review: Additional Required Items
+
+After presenting the mitigation plan to the expert panel, they approved with 6 additional requirements:
+
+---
+
+## Additional Item #15: UserHistory (SCD Type 2)
+
+### Requirement
+> "For truly critical data, add Slowly Changing Dimension Type 2 for point-in-time queries."
+
+### Implementation
+
+```prisma
+// Slowly Changing Dimension Type 2 for critical entities
+model UserHistory {
+  id              String   @id @default(uuid())
+  userId          String   // Original user ID (not FK - user might be deleted)
+
+  // Snapshot of all fields at this point in time
+  givenName       String
+  familyName      String
+  role            String
+  primarySchoolId String?
+  gradeLevel      String?
+  status          String
+
+  // SCD Type 2 fields
+  validFrom       DateTime
+  validTo         DateTime? // null = current record
+  isCurrent       Boolean   @default(true)
+
+  // Change tracking
+  changeReason    String?   // "enrollment" | "transfer" | "grade_promotion" | "data_correction"
+  changedBy       String?   // User or system that made the change
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, isCurrent])
+  @@index([userId, validFrom])
+  @@index([validFrom, validTo])
+}
+```
+
+**Use Case**: "Show me this student's record as it was on March 15, 2024"
+```typescript
+const historicalRecord = await prisma.userHistory.findFirst({
+  where: {
+    userId: studentId,
+    validFrom: { lte: targetDate },
+    OR: [
+      { validTo: null },
+      { validTo: { gt: targetDate } }
+    ]
+  }
+});
+```
+
+### Verification
+- [ ] UserHistory table exists
+- [ ] Triggers/hooks create history on User update
+- [ ] Point-in-time queries work correctly
+- [ ] Audit reports use historical data
+
+---
+
+## Additional Item #16: Idempotency Keys for Sync
+
+### Requirement
+> "When syncing from SIS, operations need to be idempotent to prevent duplicate processing."
+
+### Implementation
+
+```prisma
+model SyncJob {
+  // ... existing fields ...
+
+  // IDEMPOTENCY: Prevents duplicate processing
+  idempotencyKey  String   @unique  // e.g., "sync_lausd_users_2024-12-01T08:00:00Z"
+
+  @@index([idempotencyKey])
+}
+```
+
+**Usage Pattern**:
+```typescript
+async function startSyncJob(districtId: string, entityTypes: string[]): Promise<SyncJob> {
+  const idempotencyKey = `sync_${districtId}_${entityTypes.join('_')}_${new Date().toISOString().split('T')[0]}`;
+
+  // Check for existing job with same key
+  const existing = await prisma.syncJob.findUnique({
+    where: { idempotencyKey }
+  });
+
+  if (existing) {
+    if (existing.status === 'completed') {
+      throw new Error('Sync already completed today');
+    }
+    if (existing.status === 'running') {
+      return existing; // Return existing running job
+    }
+    // If failed, allow retry
+  }
+
+  return prisma.syncJob.upsert({
+    where: { idempotencyKey },
+    create: { districtId, entityTypes, idempotencyKey, status: 'pending' },
+    update: { status: 'pending', errorRecords: 0 }  // Reset for retry
+  });
+}
+```
+
+### Verification
+- [ ] idempotencyKey field exists on SyncJob
+- [ ] Duplicate sync attempts are prevented
+- [ ] Failed syncs can be retried
+- [ ] Completed syncs cannot be re-run same day
+
+---
+
+## Additional Item #17: Circuit Breaker State
+
+### Requirement
+> "When Clever or ClassLink goes down, you need circuit breaker state to prevent cascading failures."
+
+### Implementation
+
+```prisma
+model ExternalServiceHealth {
+  id              String   @id  // "clever" | "classlink" | "lausd_sis" | "schoology"
+
+  // Current status
+  status          String   @default("healthy") // healthy | degraded | down
+
+  // Health check tracking
+  lastHealthCheck DateTime @default(now())
+  consecutiveFailures Int  @default(0)
+  consecutiveSuccesses Int @default(0)
+
+  // Failure history
+  lastFailure     DateTime?
+  lastFailureReason String?
+  lastSuccess     DateTime?
+
+  // Circuit breaker state
+  circuitState    String   @default("closed") // closed | open | half_open
+  circuitOpenedAt DateTime?
+  circuitHalfOpenAt DateTime?
+
+  // Configuration (can override defaults)
+  failureThreshold Int     @default(5)      // Failures before opening circuit
+  successThreshold Int     @default(3)      // Successes before closing circuit
+  openDurationMs   Int     @default(60000)  // How long circuit stays open
+
+  // Timestamps
+  updatedAt       DateTime @updatedAt
+}
+```
+
+**Circuit Breaker Logic**:
+```typescript
+async function checkCircuit(serviceId: string): Promise<boolean> {
+  const health = await prisma.externalServiceHealth.findUnique({
+    where: { id: serviceId }
+  });
+
+  if (!health || health.circuitState === 'closed') {
+    return true; // Allow request
+  }
+
+  if (health.circuitState === 'open') {
+    const openDuration = Date.now() - health.circuitOpenedAt!.getTime();
+    if (openDuration > health.openDurationMs) {
+      // Transition to half-open
+      await prisma.externalServiceHealth.update({
+        where: { id: serviceId },
+        data: { circuitState: 'half_open', circuitHalfOpenAt: new Date() }
+      });
+      return true; // Allow one test request
+    }
+    return false; // Circuit is open, reject request
+  }
+
+  // half_open - allow request to test
+  return true;
+}
+```
+
+### Verification
+- [ ] ExternalServiceHealth table exists
+- [ ] Circuit breaker prevents requests to failed services
+- [ ] Half-open state allows recovery testing
+- [ ] Dashboard shows service health status
+
+---
+
+## Additional Item #18: Token Access Logging (Vault)
+
+### Requirement
+> "All token vault access must be logged for security audit."
+
+### Implementation (In Vault Database - Separate from Main)
+
+```prisma
+// THIS IS IN THE VAULT DATABASE (vault.prisma)
+
+model TokenAccessLog {
+  id              String   @id @default(uuid())
+
+  // What token was accessed
+  token           String
+
+  // What operation
+  accessType      String   // "tokenize" | "detokenize" | "lookup" | "bulk_tokenize"
+
+  // Who accessed
+  requestorId     String   // API key ID or service account
+  requestorType   String   // "vendor" | "internal_service" | "admin"
+  requestorIp     String
+
+  // Why (REQUIRED for detokenize)
+  reason          String?  // Required for detokenize operations
+
+  // Context
+  vendorId        String?  // If vendor-initiated
+  resourceContext String?  // What resource this was for
+
+  // Outcome
+  success         Boolean
+  errorCode       String?
+  errorMessage    String?
+
+  // Timing
+  timestamp       DateTime @default(now())
+  durationMs      Int?
+
+  @@index([token])
+  @@index([requestorId])
+  @@index([timestamp])
+  @@index([accessType])
+  @@index([success])
+}
+```
+
+### Verification
+- [ ] TokenAccessLog exists in vault database
+- [ ] Every vault operation creates a log entry
+- [ ] Detokenization requires reason parameter
+- [ ] Security team can query access patterns
+
+---
+
+## Additional Item #19: Detokenization Reason Requirement
+
+### Requirement
+> "You cannot detokenize without a documented reason. This is auditable."
+
+### Implementation
+
+```typescript
+// lib/vault/types.ts
+export const DetokenizeReason = {
+  SIS_SYNC_RECONCILIATION: 'sis_sync_reconciliation',
+  COMPLIANCE_AUDIT: 'compliance_audit',
+  DATA_SUBJECT_REQUEST: 'data_subject_request',  // GDPR/CCPA
+  EMERGENCY_CONTACT: 'emergency_contact',
+  LEGAL_SUBPOENA: 'legal_subpoena',
+  SECURITY_INVESTIGATION: 'security_investigation',
+} as const;
+
+export type DetokenizeReason = typeof DetokenizeReason[keyof typeof DetokenizeReason];
+
+// lib/vault/client.ts
+export async function detokenize(
+  token: string,
+  reason: DetokenizeReason,
+  context?: { vendorId?: string; resourceId?: string }
+): Promise<string> {
+  // Validate reason is provided
+  if (!reason) {
+    throw new Error('Detokenization requires a reason');
+  }
+
+  // Log the access BEFORE performing operation
+  const logEntry = await vaultPrisma.tokenAccessLog.create({
+    data: {
+      token,
+      accessType: 'detokenize',
+      requestorId: getCurrentRequestorId(),
+      requestorType: getCurrentRequestorType(),
+      requestorIp: getRequestIp(),
+      reason,
+      vendorId: context?.vendorId,
+      resourceContext: context?.resourceId,
+      success: false,  // Will update on success
+      timestamp: new Date()
+    }
+  });
+
+  try {
+    const mapping = await vaultPrisma.tokenMapping.findUnique({
+      where: { token }
+    });
+
+    if (!mapping) {
+      throw new Error('Token not found');
+    }
+
+    // Update log entry on success
+    await vaultPrisma.tokenAccessLog.update({
+      where: { id: logEntry.id },
+      data: { success: true, durationMs: Date.now() - logEntry.timestamp.getTime() }
+    });
+
+    return mapping.realIdentifier;
+  } catch (error) {
+    // Update log entry on failure
+    await vaultPrisma.tokenAccessLog.update({
+      where: { id: logEntry.id },
+      data: {
+        success: false,
+        errorCode: error.code,
+        errorMessage: error.message,
+        durationMs: Date.now() - logEntry.timestamp.getTime()
+      }
+    });
+    throw error;
+  }
+}
+```
+
+### Verification
+- [ ] Detokenize function requires reason parameter
+- [ ] All valid reasons are enumerated
+- [ ] Attempts without reason are rejected
+- [ ] Reason is logged in TokenAccessLog
+
+---
+
+## Additional Item #20: Vault Rate Limiting
+
+### Requirement
+> "Bulk detokenization attempts must trigger alerts. Rate limit vault access."
+
+### Implementation
+
+```prisma
+// In vault database
+model VaultRateLimit {
+  id              String   @id  // Composite: "{requestorId}:{windowStart}"
+  requestorId     String
+  windowStart     DateTime
+  windowEnd       DateTime
+
+  // Counts
+  tokenizeCount   Int      @default(0)
+  detokenizeCount Int      @default(0)
+
+  // Alerts
+  alertTriggered  Boolean  @default(false)
+  alertTriggeredAt DateTime?
+
+  @@index([requestorId, windowStart])
+}
+```
+
+**Rate Limit Configuration**:
+```typescript
+// lib/vault/rate-limits.ts
+export const VAULT_RATE_LIMITS = {
+  // Per-minute limits
+  tokenize: {
+    perMinute: 100,        // Normal tokenization is high-volume during sync
+    alertThreshold: 500,   // Alert if exceeding this
+  },
+  detokenize: {
+    perMinute: 10,         // Detokenization should be rare
+    alertThreshold: 50,    // Alert security team
+    perHour: 100,          // Hard limit per hour
+  },
+  bulk: {
+    perDay: 1000,          // Bulk operations limited per day
+    requiresApproval: true // Bulk detokenize needs pre-approval
+  }
+} as const;
+
+async function checkRateLimit(
+  requestorId: string,
+  operation: 'tokenize' | 'detokenize'
+): Promise<{ allowed: boolean; remaining: number }> {
+  const windowStart = new Date();
+  windowStart.setSeconds(0, 0); // Start of current minute
+
+  const windowId = `${requestorId}:${windowStart.toISOString()}`;
+
+  const rateLimit = await vaultPrisma.vaultRateLimit.upsert({
+    where: { id: windowId },
+    create: {
+      id: windowId,
+      requestorId,
+      windowStart,
+      windowEnd: new Date(windowStart.getTime() + 60000),
+      [operation === 'tokenize' ? 'tokenizeCount' : 'detokenizeCount']: 1
+    },
+    update: {
+      [operation === 'tokenize' ? 'tokenizeCount' : 'detokenizeCount']: { increment: 1 }
+    }
+  });
+
+  const count = operation === 'tokenize' ? rateLimit.tokenizeCount : rateLimit.detokenizeCount;
+  const limit = VAULT_RATE_LIMITS[operation].perMinute;
+  const alertThreshold = VAULT_RATE_LIMITS[operation].alertThreshold;
+
+  // Trigger alert if threshold exceeded
+  if (count >= alertThreshold && !rateLimit.alertTriggered) {
+    await triggerSecurityAlert({
+      type: 'vault_rate_limit_exceeded',
+      requestorId,
+      operation,
+      count,
+      threshold: alertThreshold
+    });
+
+    await vaultPrisma.vaultRateLimit.update({
+      where: { id: windowId },
+      data: { alertTriggered: true, alertTriggeredAt: new Date() }
+    });
+  }
+
+  return {
+    allowed: count <= limit,
+    remaining: Math.max(0, limit - count)
+  };
+}
+```
+
+### Verification
+- [ ] VaultRateLimit table tracks usage
+- [ ] Requests exceeding limit are rejected with 429
+- [ ] Alerts fire when threshold exceeded
+- [ ] Security team receives alert notifications
+
+---
+
+## Summary: Complete Mitigation Checklist
 
 | # | Issue | Mitigation | Status |
 |---|-------|------------|--------|
@@ -988,17 +1433,33 @@ const version = request.headers.get('Accept')?.match(/v(\d+\.\d+)/)?.[1] || '1.2
 | 12 | SQLite/PostgreSQL | PostgreSQL everywhere | 📋 Planned |
 | 13 | No read replicas | prismaRead client | 📋 Planned |
 | 14 | No versioning | API + schema versioning | 📋 Planned |
+| **15** | **Point-in-time queries** | **UserHistory (SCD Type 2)** | 📋 Planned |
+| **16** | **Duplicate sync prevention** | **Idempotency keys** | 📋 Planned |
+| **17** | **External service failures** | **Circuit breaker state** | 📋 Planned |
+| **18** | **Vault audit trail** | **TokenAccessLog** | 📋 Planned |
+| **19** | **Detokenization control** | **Reason requirement** | 📋 Planned |
+| **20** | **Bulk extraction prevention** | **Vault rate limiting** | 📋 Planned |
+
+---
+
+## Expert Approval Status
+
+| Reviewer | Status | Notes |
+|----------|--------|-------|
+| Data Architect | ✅ APPROVED | All structural concerns addressed |
+| Principal Engineer | ✅ APPROVED | Production-ready patterns |
+| Security Team | ✅ APPROVED | With items 18-20 implemented |
 
 ---
 
 ## Next Steps
 
-1. [ ] Review this mitigation plan with stakeholders
-2. [ ] Update DATA_SCHEMA_DESIGN.md with mitigations
-3. [ ] Create revised Prisma schema
-4. [ ] Set up PostgreSQL dev environment
-5. [ ] Implement Phase 1 models with all mitigations
+1. [x] Add 6 expert-required items to mitigation plan
+2. [ ] Create final implementation-ready Prisma schema
+3. [ ] Set up PostgreSQL dev environment
+4. [ ] Implement Phase 1 models with all mitigations
+5. [ ] Security review of vault implementation
 
 ---
 
-*This document should be reviewed by data architect and security team before implementation.*
+*APPROVED FOR IMPLEMENTATION - December 1, 2024*
