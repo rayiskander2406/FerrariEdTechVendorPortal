@@ -1,0 +1,6 @@
+file 'scene1_hook.mp3'
+file 'scene2_problem.mp3'
+file 'scene3_solution.mp3'
+file 'scene4_integration.mp3'
+file 'scene5_leverage.mp3'
+file 'scene6_close.mp3'
