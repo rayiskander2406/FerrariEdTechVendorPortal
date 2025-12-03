@@ -1,0 +1,25 @@
+# LAUSD v1.2.19 - SHA256 Checksums
+# Verify with: shasum -a 256 -c MANIFEST.sha256
+#
+# Generated: 2024-12-03
+
+# Audio Assets (in ../../ = lausd_v1.2_sarah_v5/)
+25fe1260d61f34e185f099b58579add04b8955a1ca86caa5ac9a889dfe0aba5c  ../../hook.wav
+9e064b7f823395f6a782c6f1f887711d37aa14e8f6522a3ee004a6abaaee490b  ../../hookStats.wav
+a21ba72cb5e03f8a6742586e771fa6e85c5260ad04a14d6cddbc7b6ee35eecfb  ../../problem.wav
+4cc758bb1908b0a84d4bb41884e5f1f5ccba2eadbc8b65b95e30d8b2fcf29d57  ../../solution.wav
+63311213aea4eeee37a841be959cc80c77b7ba6c0c7fdfa27b8c6948eaa8db4e  ../../portal.wav
+fc775e90dd831aa416602f41f9494e133dce40842b2ae80d8055c1eff3a42004  ../../integration.wav
+7262d2bc48bdad14ce35b70fbac712700ab3d2670a8fe03312a258a8b8b62e56  ../../benefits.wav
+a4e9086f5400fb66bd9cbadfd51df61a8662e7deeb16dff4c30d7145093ffc54  ../../leverage.wav
+8b61dd158c4ceb8c7f4bbb9a1da24639ed7a1449c8e91fddd71961b50af811f8  ../../close.wav
+
+# Visual Assets
+b02bf961efcd089e61ecb8ffcbae877c40d9334341537063378c9e363ed0dcde  portal-screenshot.png
+be0420aab305300ee05f02def6bdb055637c0968c2b5f77c936cd24f848d7308  schoolday-logo.svg
+
+# Code Assets
+bee67fab04c25d0a12ec37584c054a25fe3f95dc801a1567e5a7a6ffc067d9b1  Main.tsx
+
+# Rendered Output
+f7b3092c4957132bd9f50efbdaec6969154ad521ffd8d03a3eb0db1653b59be3  lausd-pitch-v1.2.19.mp4

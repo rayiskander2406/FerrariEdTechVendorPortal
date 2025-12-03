@@ -21,17 +21,100 @@ const COLORS = {
   coral: '#FF8A80', // For contrast against navy
 };
 
-// v1.2.5 Scene durations - RAW Edge TTS (NO speedup, like v1.0)
-// Total: 97.82 seconds
+// v1.2.21 Scene durations - Fixed "databreach" pause (single word, no hyphen)
+// Total: 106.37 seconds
+// Voice: af_sarah (female, authoritative) - from lausd_v1.2_sarah_v5
+// Audio: Clean concatenation with 0.8s gaps
+//
+// KEY INSIGHT: For cross-fade transitions to work, scenes must OVERLAP.
+// Visual starts when PREVIOUS scene's audio ENDS (not after the 0.8s gap).
+//
+// Audio timeline (in full_voiceover_v1.2.21.mp3):
+//   hook:        0.00s - 9.09s (fixed: "databreach" as single word)
+//   hookStats:   9.89s - 21.99s
+//   problem:     22.79s - 34.62s
+//   solution:    35.42s - 51.38s
+//   portal:      52.18s - 57.86s
+//   integration: 58.66s - 75.54s
+//   benefits:    76.34s - 88.01s
+//   leverage:    88.81s - 101.02s
+//   close:       101.82s - 106.37s
+
+const FADE_FRAMES = 12; // 0.4s transition duration at 30fps
+
+// Calculate visual START as previous audio END, duration extends to this scene's audio END + fade
 const SCENES = {
-  hook: {start: 0, duration: Math.round(9.79 * 30)},                               // 0-9.79s PowerSchool punch
-  hookStats: {start: Math.round(9.79 * 30), duration: Math.round(12.38 * 30)},     // 9.79-22.17s LAUSD stats
-  problem: {start: Math.round(22.17 * 30), duration: Math.round(14.04 * 30)},      // 22.17-36.21s
-  solution: {start: Math.round(36.21 * 30), duration: Math.round(14.78 * 30)},     // 36.21-50.99s
-  integration: {start: Math.round(50.99 * 30), duration: Math.round(16.44 * 30)},  // 50.99-67.43s
-  benefits: {start: Math.round(67.43 * 30), duration: Math.round(13.42 * 30)},     // 67.43-80.85s
-  leverage: {start: Math.round(80.85 * 30), duration: Math.round(13.06 * 30)},     // 80.85-93.91s
-  close: {start: Math.round(93.91 * 30), duration: Math.round(3.91 * 30)},         // 93.91-97.82s
+  hook: {start: Math.round(0.00 * 30), duration: Math.round((9.09 - 0.00) * 30) + FADE_FRAMES},
+  hookStats: {start: Math.round(9.09 * 30), duration: Math.round((21.99 - 9.09) * 30) + FADE_FRAMES},
+  problem: {start: Math.round(21.99 * 30), duration: Math.round((34.62 - 21.99) * 30) + FADE_FRAMES},
+  solution: {start: Math.round(34.62 * 30), duration: Math.round((51.38 - 34.62) * 30) + FADE_FRAMES},
+  portal: {start: Math.round(51.38 * 30), duration: Math.round((57.86 - 51.38) * 30) + FADE_FRAMES},
+  integration: {start: Math.round(57.86 * 30), duration: Math.round((75.54 - 57.86) * 30) + FADE_FRAMES},
+  benefits: {start: Math.round(75.54 * 30), duration: Math.round((88.01 - 75.54) * 30) + FADE_FRAMES},
+  leverage: {start: Math.round(88.01 * 30), duration: Math.round((101.02 - 88.01) * 30) + FADE_FRAMES},
+  close: {start: Math.round(101.02 * 30), duration: Math.round((106.48 - 101.02) * 30)},
+};
+
+// Slide transition wrapper component - fade + subtle slide/scale
+const SlideTransition: React.FC<{
+  children: React.ReactNode;
+  durationInFrames: number;
+  fadeIn?: boolean;
+  fadeOut?: boolean;
+  direction?: 'left' | 'right' | 'up' | 'down' | 'scale';
+}> = ({children, durationInFrames, fadeIn = true, fadeOut = true, direction = 'scale'}) => {
+  const frame = useCurrentFrame();
+
+  let opacity = 1;
+  let transform = 'none';
+
+  // Transition in at start
+  if (fadeIn && frame < FADE_FRAMES) {
+    opacity = interpolate(frame, [0, FADE_FRAMES], [0, 1], {extrapolateRight: 'clamp'});
+    const progress = interpolate(frame, [0, FADE_FRAMES], [0, 1], {extrapolateRight: 'clamp'});
+    if (direction === 'scale') {
+      const scale = interpolate(progress, [0, 1], [1.02, 1]);
+      transform = `scale(${scale})`;
+    } else if (direction === 'left') {
+      const x = interpolate(progress, [0, 1], [20, 0]);
+      transform = `translateX(${x}px)`;
+    } else if (direction === 'right') {
+      const x = interpolate(progress, [0, 1], [-20, 0]);
+      transform = `translateX(${x}px)`;
+    }
+  }
+
+  // Transition out at end
+  if (fadeOut && frame > durationInFrames - FADE_FRAMES) {
+    opacity = interpolate(
+      frame,
+      [durationInFrames - FADE_FRAMES, durationInFrames],
+      [1, 0],
+      {extrapolateLeft: 'clamp'}
+    );
+    const progress = interpolate(
+      frame,
+      [durationInFrames - FADE_FRAMES, durationInFrames],
+      [0, 1],
+      {extrapolateLeft: 'clamp'}
+    );
+    if (direction === 'scale') {
+      const scale = interpolate(progress, [0, 1], [1, 0.98]);
+      transform = `scale(${scale})`;
+    } else if (direction === 'left') {
+      const x = interpolate(progress, [0, 1], [0, -20]);
+      transform = `translateX(${x}px)`;
+    } else if (direction === 'right') {
+      const x = interpolate(progress, [0, 1], [0, 20]);
+      transform = `translateX(${x}px)`;
+    }
+  }
+
+  return (
+    <AbsoluteFill style={{opacity, transform}}>
+      {children}
+    </AbsoluteFill>
+  );
 };
 
 // Scene 1a: PowerSchool Punch (v1.2 - short, devastating)
@@ -188,16 +271,19 @@ const SceneProblem: React.FC = () => {
       backgroundColor: COLORS.white,
       padding: 100,
       fontFamily: 'system-ui, -apple-system, sans-serif',
+      justifyContent: 'center',
+      alignItems: 'center',
     }}>
-      <h1 style={{
-        fontSize: 72,
-        color: COLORS.riskRed,
-        marginBottom: 60,
-        fontWeight: 'bold',
-      }}>
-        The Current Reality
-      </h1>
-      <div style={{display: 'flex', flexDirection: 'column', gap: 50}}>
+      <div style={{textAlign: 'center'}}>
+        <h1 style={{
+          fontSize: 72,
+          color: COLORS.riskRed,
+          marginBottom: 60,
+          fontWeight: 'bold',
+        }}>
+          The Current Reality
+        </h1>
+        <div style={{display: 'flex', flexDirection: 'column', gap: 50, alignItems: 'center'}}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -234,6 +320,7 @@ const SceneProblem: React.FC = () => {
             <strong style={{color: COLORS.riskRed}}>$16-19/school/month</strong> → Clever fees
           </div>
         </div>
+        </div>
       </div>
     </AbsoluteFill>
   );
@@ -249,7 +336,10 @@ const SceneSolution: React.FC = () => {
       backgroundColor: COLORS.lausdNavy,
       padding: 100,
       fontFamily: 'system-ui, -apple-system, sans-serif',
+      justifyContent: 'center',
+      alignItems: 'center',
     }}>
+      <div style={{textAlign: 'center'}}>
       <div style={{
         fontSize: 80,
         color: COLORS.lausdGold,
@@ -333,6 +423,66 @@ const SceneSolution: React.FC = () => {
           TKN_STU_8X9Y2Z → Zero Privacy Risk
         </div>
       </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Scene: Portal Demo (v1.2.19 - Enlarged portal view for detail visibility)
+const ScenePortal: React.FC = () => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+
+  return (
+    <AbsoluteFill style={{
+      background: `linear-gradient(135deg, ${COLORS.lausdNavy} 0%, #001845 100%)`,
+      padding: 30,
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}>
+      <div style={{textAlign: 'center', width: '100%'}}>
+        {/* Title - smaller to give more room to screenshot */}
+        <div style={{
+          fontSize: 42,
+          color: COLORS.lausdGold,
+          fontWeight: 700,
+          marginBottom: 20,
+          opacity: interpolate(frame, [0, 15], [0, 1], {extrapolateRight: 'clamp'}),
+        }}>
+          One Intelligent Portal
+        </div>
+
+        {/* Portal Screenshot - ENLARGED for detail visibility */}
+        <div style={{
+          transform: `scale(${spring({frame: frame - 10, fps, config: {damping: 12}})})`,
+          boxShadow: '0 40px 100px rgba(0,0,0,0.6)',
+          borderRadius: 12,
+          overflow: 'hidden',
+          border: '3px solid rgba(255,184,28,0.4)',
+          display: 'inline-block',
+        }}>
+          <Img
+            src={staticFile('portal-screenshot.png')}
+            style={{
+              width: 1700,
+              height: 'auto',
+              display: 'block',
+            }}
+          />
+        </div>
+
+        {/* Bottom tagline - positioned closer */}
+        <div style={{
+          marginTop: 20,
+          fontSize: 30,
+          color: COLORS.white,
+          opacity: interpolate(frame, [60, 90], [0, 1], {extrapolateRight: 'clamp'}),
+        }}>
+          <span style={{color: COLORS.successGreen, fontWeight: 600}}>Vendors integrate themselves.</span>
+          <span style={{marginLeft: 20}}>Your team reviews, not builds.</span>
+        </div>
+      </div>
     </AbsoluteFill>
   );
 };
@@ -354,7 +504,10 @@ const SceneIntegration: React.FC = () => {
       background: `linear-gradient(135deg, ${COLORS.lausdNavy} 0%, #001845 100%)`,
       padding: 80,
       fontFamily: 'system-ui, -apple-system, sans-serif',
+      justifyContent: 'center',
+      alignItems: 'center',
     }}>
+      <div style={{textAlign: 'center'}}>
       <div style={{
         fontSize: 64,
         color: COLORS.lausdGold,
@@ -405,6 +558,7 @@ const SceneIntegration: React.FC = () => {
           📧 Vendors message without seeing real emails or phones
         </div>
       </div>
+      </div>
     </AbsoluteFill>
   );
 };
@@ -425,7 +579,10 @@ const SceneBenefits: React.FC = () => {
       backgroundColor: COLORS.white,
       padding: 80,
       fontFamily: 'system-ui, -apple-system, sans-serif',
+      justifyContent: 'center',
+      alignItems: 'center',
     }}>
+      <div style={{textAlign: 'center'}}>
       <h1 style={{
         fontSize: 56,
         color: COLORS.lausdNavy,
@@ -457,6 +614,7 @@ const SceneBenefits: React.FC = () => {
             </div>
           </div>
         ))}
+      </div>
       </div>
     </AbsoluteFill>
   );
@@ -557,58 +715,81 @@ const SceneClose: React.FC = () => {
         }}>
           <span style={{fontSize: 42, fontWeight: 700, color: COLORS.white}}>Your students.</span>
           <span style={{fontSize: 42, fontWeight: 700, color: COLORS.lausdGold}}>Your data.</span>
-          <span style={{fontSize: 42, fontWeight: 700, color: COLORS.successGreen}}>Your control.</span>
+          <span style={{fontSize: 42, fontWeight: 700, color: COLORS.successGreen}}>Your sovereignty.</span>
         </div>
       </div>
     </AbsoluteFill>
   );
 };
 
-// Main composition - v1.2.5
+// Main composition - v1.2.18 with portal scene added after solution
 export const Main: React.FC = () => {
   return (
     <AbsoluteFill style={{backgroundColor: '#000'}}>
-      {/* Single concatenated voiceover - RAW (no speedup, like v1.0) */}
-      <Audio src={staticFile('voiceover/full_voiceover.mp3')} />
+      {/* v1.2.22 voiceover - changed "control" to "sovereignty" */}
+      <Audio src={staticFile('voiceover/full_voiceover_v1.2.22.mp3')} />
 
-      {/* Scene 1a: PowerSchool Punch */}
+      {/* Scene 1a: PowerSchool Punch (no fade-in, starts video) */}
       <Sequence from={SCENES.hook.start} durationInFrames={SCENES.hook.duration}>
-        <SceneHook />
+        <SlideTransition durationInFrames={SCENES.hook.duration} fadeIn={false} fadeOut={true}>
+          <SceneHook />
+        </SlideTransition>
       </Sequence>
 
-      {/* Scene 1b: LAUSD Stats (secondary hook) */}
+      {/* Scene 1b: LAUSD Stats (slide transition from hook) */}
       <Sequence from={SCENES.hookStats.start} durationInFrames={SCENES.hookStats.duration}>
-        <SceneHookStats />
+        <SlideTransition durationInFrames={SCENES.hookStats.duration} fadeIn={true} fadeOut={true}>
+          <SceneHookStats />
+        </SlideTransition>
       </Sequence>
 
       {/* Scene 2: Problem */}
       <Sequence from={SCENES.problem.start} durationInFrames={SCENES.problem.duration}>
-        <SceneProblem />
+        <SlideTransition durationInFrames={SCENES.problem.duration} fadeIn={true} fadeOut={true}>
+          <SceneProblem />
+        </SlideTransition>
       </Sequence>
 
       {/* Scene 3: Solution */}
       <Sequence from={SCENES.solution.start} durationInFrames={SCENES.solution.duration}>
-        <SceneSolution />
+        <SlideTransition durationInFrames={SCENES.solution.duration} fadeIn={true} fadeOut={true}>
+          <SceneSolution />
+        </SlideTransition>
+      </Sequence>
+
+      {/* Scene 3b: Portal Demo (NEW in v1.2.18) */}
+      <Sequence from={SCENES.portal.start} durationInFrames={SCENES.portal.duration}>
+        <SlideTransition durationInFrames={SCENES.portal.duration} fadeIn={true} fadeOut={true}>
+          <ScenePortal />
+        </SlideTransition>
       </Sequence>
 
       {/* Scene 4: Integration */}
       <Sequence from={SCENES.integration.start} durationInFrames={SCENES.integration.duration}>
-        <SceneIntegration />
+        <SlideTransition durationInFrames={SCENES.integration.duration} fadeIn={true} fadeOut={true}>
+          <SceneIntegration />
+        </SlideTransition>
       </Sequence>
 
       {/* Scene 5: Benefits */}
       <Sequence from={SCENES.benefits.start} durationInFrames={SCENES.benefits.duration}>
-        <SceneBenefits />
+        <SlideTransition durationInFrames={SCENES.benefits.duration} fadeIn={true} fadeOut={true}>
+          <SceneBenefits />
+        </SlideTransition>
       </Sequence>
 
       {/* Scene 6: Leverage */}
       <Sequence from={SCENES.leverage.start} durationInFrames={SCENES.leverage.duration}>
-        <SceneLeverage />
+        <SlideTransition durationInFrames={SCENES.leverage.duration} fadeIn={true} fadeOut={true}>
+          <SceneLeverage />
+        </SlideTransition>
       </Sequence>
 
-      {/* Scene 7: Close with Logo + Tagline */}
+      {/* Scene 7: Close with Logo + Tagline (no fade-out, ends video) */}
       <Sequence from={SCENES.close.start} durationInFrames={SCENES.close.duration}>
-        <SceneClose />
+        <SlideTransition durationInFrames={SCENES.close.duration} fadeIn={true} fadeOut={false}>
+          <SceneClose />
+        </SlideTransition>
       </Sequence>
     </AbsoluteFill>
   );

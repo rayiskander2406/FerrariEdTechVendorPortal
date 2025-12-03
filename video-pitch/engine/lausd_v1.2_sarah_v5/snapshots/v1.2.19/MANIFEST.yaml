@@ -1,0 +1,116 @@
+# LAUSD Video v1.2.19 - Complete Asset Manifest
+# Generated: 2024-12-03
+#
+# This manifest provides SHA256 hashes for all frozen assets.
+# Any modification to these files will break the baseline.
+#
+# To verify integrity:
+#   shasum -a 256 -c MANIFEST.sha256
+
+version: v1.2.19
+created: 2024-12-03T12:53:00Z
+voice: af_sarah
+duration_seconds: 106.48
+fps: 30
+
+# ═══════════════════════════════════════════════════════════════
+# AUDIO ASSETS (frozen - do not modify)
+# ═══════════════════════════════════════════════════════════════
+audio:
+  hook.wav:
+    sha256: 25fe1260d61f34e185f099b58579add04b8955a1ca86caa5ac9a889dfe0aba5c
+    duration: 9.20s
+    script: "December 2024. PowerSchool breached..."
+
+  hookStats.wav:
+    sha256: 9e064b7f823395f6a782c6f1f887711d37aa14e8f6522a3ee004a6abaaee490b
+    duration: 12.10s
+    script: "For LAUSD, that means..."
+
+  problem.wav:
+    sha256: a21ba72cb5e03f8a6742586e771fa6e85c5260ad04a14d6cddbc7b6ee35eecfb
+    duration: 11.82s
+    script: "Right now, your privacy team..."
+
+  solution.wav:
+    sha256: 4cc758bb1908b0a84d4bb41884e5f1f5ccba2eadbc8b65b95e30d8b2fcf29d57
+    duration: 15.97s
+    script: "SchoolDay flips the model..."
+
+  portal.wav:
+    sha256: 63311213aea4eeee37a841be959cc80c77b7ba6c0c7fdfa27b8c6948eaa8db4e
+    duration: 5.69s
+    script: "Here's what vendors see..."
+
+  integration.wav:
+    sha256: fc775e90dd831aa416602f41f9494e133dce40842b2ae80d8055c1eff3a42004
+    duration: 16.88s
+    script: "One platform, every integration..."
+
+  benefits.wav:
+    sha256: 7262d2bc48bdad14ce35b70fbac712700ab3d2670a8fe03312a258a8b8b62e56
+    duration: 11.67s
+    script: "For LAUSD, this means..."
+
+  leverage.wav:
+    sha256: a4e9086f5400fb66bd9cbadfd51df61a8662e7deeb16dff4c30d7145093ffc54
+    duration: 12.21s
+    script: "Vendors using SchoolDay..."
+
+  close.wav:
+    sha256: 8b61dd158c4ceb8c7f4bbb9a1da24639ed7a1449c8e91fddd71961b50af811f8
+    duration: 4.55s
+    script: "SchoolDay. Your students..."
+
+# ═══════════════════════════════════════════════════════════════
+# VISUAL ASSETS (frozen - do not modify)
+# ═══════════════════════════════════════════════════════════════
+visuals:
+  portal-screenshot.png:
+    sha256: b02bf961efcd089e61ecb8ffcbae877c40d9334341537063378c9e363ed0dcde
+    dimensions: 1920x1080
+    description: "Vendor portal AI chat interface screenshot"
+
+  schoolday-logo.svg:
+    sha256: be0420aab305300ee05f02def6bdb055637c0968c2b5f77c936cd24f848d7308
+    description: "SchoolDay logo (white version for dark backgrounds)"
+
+# ═══════════════════════════════════════════════════════════════
+# CODE ASSETS (frozen - do not modify)
+# ═══════════════════════════════════════════════════════════════
+code:
+  Main.tsx:
+    sha256: bee67fab04c25d0a12ec37584c054a25fe3f95dc801a1567e5a7a6ffc067d9b1
+    description: "Remotion scene components (v1.2.19 - enlarged portal view)"
+    scenes:
+      - SceneHook
+      - SceneHookStats
+      - SceneProblem
+      - SceneSolution
+      - ScenePortal
+      - SceneIntegration
+      - SceneBenefits
+      - SceneLeverage
+      - SceneClose
+
+# ═══════════════════════════════════════════════════════════════
+# RENDERED OUTPUT (final deliverable)
+# ═══════════════════════════════════════════════════════════════
+output:
+  lausd-pitch-v1.2.19.mp4:
+    sha256: f7b3092c4957132bd9f50efbdaec6969154ad521ffd8d03a3eb0db1653b59be3
+    size_bytes: 11595359
+    resolution: 1920x1080
+    duration: 106.48s
+    fps: 30
+    codec: H.264
+
+# ═══════════════════════════════════════════════════════════════
+# CHANGE LOG
+# ═══════════════════════════════════════════════════════════════
+changes_from_v1_2_17:
+  - "Added portal.wav scene (5.69s)"
+  - "Enlarged portal screenshot from 1200px to 1700px width"
+  - "Reduced padding around portal (60px → 30px)"
+  - "Adjusted title/tagline fonts for balance"
+  - "Enhanced shadow on portal screenshot"
