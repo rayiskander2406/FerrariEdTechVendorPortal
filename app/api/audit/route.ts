@@ -1,97 +1,169 @@
 /**
- * Audit Log API - Server-side audit logging
+ * Audit Logs API
  *
- * This endpoint handles audit log operations.
- * Client components must use this API instead of importing from lib/db directly.
+ * V1-08: List and query audit logs with filtering and pagination.
  *
- * POST - Log an audit event
- * GET - Retrieve audit logs for a vendor
+ * Endpoints:
+ * - GET /api/audit - List audit logs (requires auth + audit scope)
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { logAuditEvent, getAuditLogs, type AuditEventInput } from "@/lib/db";
+import { NextRequest, NextResponse } from 'next/server';
+import { withAuth, type AuthContext } from '@/lib/auth';
+import {
+  getAuditLogs,
+  isValidAction,
+  isValidResourceType,
+  type AuditAction,
+  type AuditResourceType,
+} from '@/lib/audit';
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
+
+// =============================================================================
+// HELPERS
+// =============================================================================
 
 /**
- * POST - Log an audit event
+ * Parse details JSON, returning null if invalid
  */
-export async function POST(request: NextRequest) {
+function parseDetails(details: string | null): Record<string, unknown> | null {
+  if (!details) return null;
   try {
-    const body = await request.json();
-
-    // Validate required fields
-    if (!body.vendorId || !body.action || !body.resourceType) {
-      return NextResponse.json(
-        { error: "Missing required fields: vendorId, action, resourceType" },
-        { status: 400 }
-      );
-    }
-
-    const event: AuditEventInput = {
-      vendorId: body.vendorId,
-      action: body.action,
-      resourceType: body.resourceType,
-      resourceId: body.resourceId,
-      details: body.details,
-      ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined,
-      userAgent: request.headers.get("user-agent") ?? undefined,
-    };
-
-    const auditLog = await logAuditEvent(event);
-
-    return NextResponse.json({
-      success: true,
-      auditLog: {
-        id: auditLog.id,
-        vendorId: auditLog.vendorId,
-        action: auditLog.action,
-        resourceType: auditLog.resourceType,
-        timestamp: auditLog.timestamp.toISOString(),
-      },
-    });
-  } catch (error) {
-    console.error("[API/audit] Error logging audit event:", error);
-    return NextResponse.json(
-      { error: "Failed to log audit event" },
-      { status: 500 }
-    );
+    return JSON.parse(details);
+  } catch {
+    return null;
   }
 }
 
 /**
- * GET - Retrieve audit logs for a vendor
- *
- * Query params:
- * - vendorId: Required - the vendor to get logs for
- * - limit: Optional - max number of logs (default 100)
+ * Format audit log for response
  */
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const vendorId = searchParams.get("vendorId");
-    const limit = parseInt(searchParams.get("limit") ?? "100", 10);
+function formatAuditLog(log: {
+  id: string;
+  vendorId: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  details: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  timestamp: Date;
+  retainUntil: Date | null;
+}) {
+  return {
+    id: log.id,
+    vendorId: log.vendorId,
+    action: log.action,
+    resourceType: log.resourceType,
+    resourceId: log.resourceId,
+    details: parseDetails(log.details),
+    ipAddress: log.ipAddress,
+    userAgent: log.userAgent,
+    timestamp: log.timestamp.toISOString(),
+    retainUntil: log.retainUntil?.toISOString() || null,
+  };
+}
 
-    if (!vendorId) {
-      return NextResponse.json(
-        { error: "Missing required query param: vendorId" },
-        { status: 400 }
-      );
-    }
+// =============================================================================
+// GET /api/audit
+// =============================================================================
 
-    const logs = await getAuditLogs(vendorId, limit);
+async function handleGet(
+  request: NextRequest,
+  context: AuthContext
+): Promise<Response> {
+  const { vendorId, scopes } = context;
 
-    return NextResponse.json({
-      success: true,
-      count: logs.length,
-      logs: logs.map((log) => ({
-        ...log,
-        timestamp: log.timestamp.toISOString(),
-      })),
-    });
-  } catch (error) {
-    console.error("[API/audit] Error retrieving audit logs:", error);
+  // Check for audit scope
+  if (!scopes.includes('audit') && !scopes.includes('admin')) {
     return NextResponse.json(
-      { error: "Failed to retrieve audit logs" },
-      { status: 500 }
+      { error: 'Missing required scope: audit' },
+      { status: 403 }
     );
   }
+
+  // Parse query parameters
+  const { searchParams } = new URL(request.url);
+
+  const action = searchParams.get('action');
+  const resourceType = searchParams.get('resourceType');
+  const resourceId = searchParams.get('resourceId');
+  const startDateStr = searchParams.get('startDate');
+  const endDateStr = searchParams.get('endDate');
+  const limitStr = searchParams.get('limit');
+  const offsetStr = searchParams.get('offset');
+
+  // Validate action if provided
+  if (action && !isValidAction(action)) {
+    return NextResponse.json(
+      { error: `Invalid action: ${action}` },
+      { status: 400 }
+    );
+  }
+
+  // Validate resource type if provided
+  if (resourceType && !isValidResourceType(resourceType)) {
+    return NextResponse.json(
+      { error: `Invalid resourceType: ${resourceType}` },
+      { status: 400 }
+    );
+  }
+
+  // Parse dates
+  const startDate = startDateStr ? new Date(startDateStr) : undefined;
+  const endDate = endDateStr ? new Date(endDateStr) : undefined;
+
+  // Parse pagination
+  let limit = limitStr ? parseInt(limitStr, 10) : DEFAULT_LIMIT;
+  const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
+
+  // Enforce max limit
+  if (limit > MAX_LIMIT) {
+    limit = MAX_LIMIT;
+  }
+
+  // Get audit logs
+  const result = await getAuditLogs({
+    vendorId,
+    action: action as AuditAction | undefined,
+    resourceType: resourceType as AuditResourceType | undefined,
+    resourceId: resourceId || undefined,
+    startDate,
+    endDate,
+    limit,
+    offset,
+  });
+
+  // Format response
+  const formattedLogs = result.logs.map(formatAuditLog);
+
+  return NextResponse.json(
+    {
+      logs: formattedLogs,
+      total: result.total,
+      pagination: {
+        limit,
+        offset,
+        hasMore: result.hasMore,
+      },
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    }
+  );
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export async function GET(request: NextRequest): Promise<Response> {
+  return withAuth(request, handleGet);
 }

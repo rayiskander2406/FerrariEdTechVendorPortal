@@ -571,11 +571,74 @@ model Vendor {
   messageTemplates MessageTemplate[]
   messageBatches   MessageBatch[]
   ssoSessions      SsoSession[]
+  apiKeys          ApiKey[]
+  chatSessions     VendorSession[]
+  usageRecords     VendorUsage[]
 
   @@index([contactEmail])
   @@index([podsStatus])
   @@index([defaultAccessTier])
   @@index([deletedAt])
+}
+
+// =============================================================================
+// VENDOR SESSION (V1-04)
+// =============================================================================
+
+model VendorSession {
+  id       String @id @default(uuid())
+  vendorId String
+
+  // Session identification
+  sessionToken String @unique
+
+  // Conversation state (stored as JSON)
+  conversationHistory Json @default("[]") // Array of {id, role, content, timestamp}
+  vendorState         Json @default("{}") // Vendor-specific state object
+
+  // Session lifecycle
+  expiresAt      DateTime
+  lastActivityAt DateTime @default(now())
+
+  // Standard timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([sessionToken])
+  @@index([expiresAt])
+  @@index([lastActivityAt])
+}
+
+// =============================================================================
+// VENDOR USAGE (V1-06)
+// =============================================================================
+
+model VendorUsage {
+  id       String @id @default(uuid())
+  vendorId String
+  month    String // YYYY-MM format
+
+  // Usage counts by channel
+  emailCount Int @default(0)
+  smsCount   Int @default(0)
+
+  // Cost tracking
+  totalCost Float @default(0)
+
+  // Standard timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, month])
+  @@index([vendorId])
+  @@index([month])
 }
 
 model VendorDataGrant {
@@ -1287,6 +1350,41 @@ model SandboxCredentials {
   @@index([vendorId])
   @@index([status])
   @@index([deletedAt])
+}
+
+// =============================================================================
+// API KEY AUTHENTICATION (V1-02)
+// =============================================================================
+
+model ApiKey {
+  id       String @id @default(uuid())
+  vendorId String
+
+  // Key storage (hash only - plaintext never stored)
+  keyPrefix String // First 15 chars for identification (e.g., "sd_test_abc123")
+  keyHash   String @unique // SHA-256 hash of full key
+
+  // Metadata
+  name   String   @default("Default")
+  scopes String[] @default(["read", "write"]) // read, write, message, admin
+
+  // Lifecycle
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  usageCount Int       @default(0)
+
+  // Standard timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([keyPrefix])
+  @@index([revokedAt])
+  @@index([expiresAt])
 }
 
 // =============================================================================
