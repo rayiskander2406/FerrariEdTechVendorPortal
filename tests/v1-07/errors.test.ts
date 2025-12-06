@@ -24,13 +24,9 @@ vi.mock('@sentry/nextjs', () => {
     setTag: vi.fn(),
     setExtra: vi.fn(),
     addBreadcrumb: vi.fn(),
-    startTransaction: vi.fn().mockReturnValue({
-      finish: vi.fn(),
-      setStatus: vi.fn(),
-      startChild: vi.fn().mockReturnValue({
-        finish: vi.fn(),
-        setStatus: vi.fn(),
-      }),
+    startSpan: vi.fn().mockImplementation((_options, callback) => {
+      if (callback) return callback();
+      return undefined;
     }),
     Severity: {
       Error: 'error',
@@ -220,17 +216,28 @@ describe('Error Tracking', () => {
   // ===========================================================================
 
   describe('startPerformanceTransaction', () => {
-    it('starts a transaction', () => {
-      const transaction = startPerformanceTransaction({
+    it('executes callback within span when provided', () => {
+      const callback = vi.fn().mockReturnValue('test-result');
+
+      const result = startPerformanceTransaction(
+        { name: 'POST /api/messages', op: 'http.server' },
+        callback
+      );
+
+      expect(Sentry.startSpan).toHaveBeenCalledWith(
+        { name: 'POST /api/messages', op: 'http.server' },
+        callback
+      );
+      expect(result).toBe('test-result');
+    });
+
+    it('returns undefined when no callback provided', () => {
+      const result = startPerformanceTransaction({
         name: 'POST /api/messages',
         op: 'http.server',
       });
 
-      expect(Sentry.startTransaction).toHaveBeenCalledWith({
-        name: 'POST /api/messages',
-        op: 'http.server',
-      });
-      expect(transaction).toBeDefined();
+      expect(result).toBeUndefined();
     });
   });
 

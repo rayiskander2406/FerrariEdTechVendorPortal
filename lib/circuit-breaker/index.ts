@@ -73,6 +73,7 @@ export interface ServiceHealth {
   lastFailureReason?: string;
   lastSuccess?: Date;
   circuitOpenedAt?: Date;
+  circuitHalfOpenAt?: Date;
 }
 
 /**
@@ -350,7 +351,7 @@ export async function withCircuitBreaker<T>(
 
   // Check if circuit is open
   if (health.circuitState === 'open') {
-    const config = DEFAULT_CONFIGS[serviceId] || DEFAULT_CONFIGS.clever;
+    const config = DEFAULT_CONFIGS[serviceId] || DEFAULT_CONFIGS.clever!;
     const reopensAt = new Date(health.circuitOpenedAt!.getTime() + config.openDurationMs);
 
     if (new Date() < reopensAt) {
@@ -393,7 +394,7 @@ export async function isServiceAvailable(serviceId: ExternalServiceId): Promise<
   if (!health) return true; // Unknown service assumed available
 
   if (health.circuitState === 'open') {
-    const config = DEFAULT_CONFIGS[serviceId] || DEFAULT_CONFIGS.clever;
+    const config = DEFAULT_CONFIGS[serviceId] || DEFAULT_CONFIGS.clever!;
     const reopensAt = new Date(health.circuitOpenedAt!.getTime() + config.openDurationMs);
     return new Date() >= reopensAt;
   }
@@ -430,6 +431,7 @@ function toServiceHealth(record: {
   lastFailureReason: string | null;
   lastSuccess: Date | null;
   circuitOpenedAt: Date | null;
+  circuitHalfOpenAt: Date | null;
 }): ServiceHealth {
   return {
     id: record.id as ExternalServiceId,
@@ -442,6 +444,7 @@ function toServiceHealth(record: {
     lastFailureReason: record.lastFailureReason ?? undefined,
     lastSuccess: record.lastSuccess ?? undefined,
     circuitOpenedAt: record.circuitOpenedAt ?? undefined,
+    circuitHalfOpenAt: record.circuitHalfOpenAt ?? undefined,
   };
 }
 

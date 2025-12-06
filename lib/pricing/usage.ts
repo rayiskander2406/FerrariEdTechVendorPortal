@@ -196,7 +196,7 @@ export async function getUsageHistory(
     let growthRate: number | undefined;
 
     if (index < history.length - 1) {
-      const previousRecord = history[index + 1];
+      const previousRecord = history[index + 1]!;
       const previousTotal = previousRecord.emailCount + previousRecord.smsCount;
 
       if (previousTotal > 0) {
@@ -274,7 +274,9 @@ export async function getUsageByChannel(
  */
 export function getBillingPeriod(month?: string): BillingPeriod {
   const targetMonth = month || getCurrentMonth();
-  const [year, monthNum] = targetMonth.split('-').map(Number);
+  const parts = targetMonth.split('-').map(Number);
+  const year = parts[0] ?? new Date().getFullYear();
+  const monthNum = parts[1] ?? new Date().getMonth() + 1;
 
   // Start date is first of month
   const startDate = new Date(year, monthNum - 1, 1);

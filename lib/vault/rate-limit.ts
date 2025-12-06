@@ -165,7 +165,7 @@ async function getConfig(requestorType: string): Promise<RateLimitConfig> {
     // Fall back to defaults if DB unavailable
   }
 
-  return DEFAULT_CONFIG[requestorType] ?? DEFAULT_CONFIG.vendor;
+  return DEFAULT_CONFIG[requestorType] ?? DEFAULT_CONFIG['vendor']!;
 }
 
 /**

@@ -133,7 +133,8 @@ export function tokenizedEmail(token: string): string {
   if (!match) {
     throw new Error(`Invalid token format: ${token}`);
   }
-  const [, type, hash] = match;
+  const type = match[1]!;
+  const hash = match[2]!;
   return `TKN_${type}_${hash.toLowerCase()}@relay.schoolday.lausd.net`;
 }
 
@@ -173,7 +174,7 @@ export function parseToken(token: string): ParsedToken | null {
   }
   return {
     type: match[1] as TokenType,
-    hash: match[2],
+    hash: match[2]!,
     original: token,
   };
 }

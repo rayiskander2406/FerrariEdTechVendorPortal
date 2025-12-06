@@ -38,6 +38,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 // =============================================================================
@@ -213,7 +214,7 @@ export async function createSession(
       vendorId: input.vendorId,
       sessionToken: generateSessionToken(),
       conversationHistory: [],
-      vendorState: input.initialState || {},
+      vendorState: (input.initialState || {}) as Prisma.InputJsonValue,
       expiresAt,
       lastActivityAt: now,
     },

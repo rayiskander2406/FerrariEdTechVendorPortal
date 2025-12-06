@@ -174,7 +174,7 @@ export function createMockVaultClient(): Partial<PrismaClient> {
           return tokenMappings.get(args.where.token) ?? null;
         }
         if (args.where.realIdentifier) {
-          for (const mapping of tokenMappings.values()) {
+          for (const mapping of Array.from(tokenMappings.values())) {
             if (mapping.realIdentifier === args.where.realIdentifier) {
               return mapping;
             }

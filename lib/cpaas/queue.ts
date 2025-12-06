@@ -622,7 +622,7 @@ export async function processNextMessage(): Promise<QueuedMessage | null> {
     return null;
   }
 
-  const message = messages[0];
+  const message = messages[0]!;
 
   // Lock message by updating status to processing
   const updated = await prisma.communicationMessage.update({
@@ -639,7 +639,7 @@ export async function processNextMessage(): Promise<QueuedMessage | null> {
     subject: updated.subject || undefined,
     body: updated.body,
     status: updated.status,
-    retryCount: 0,
+    retryCount: updated.retryCount,
     createdAt: updated.createdAt,
   };
 }

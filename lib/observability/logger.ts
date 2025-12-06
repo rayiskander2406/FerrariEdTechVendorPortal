@@ -178,11 +178,11 @@ export function redactPII<T>(data: T): T {
   }
 
   if (typeof data === 'string') {
-    let result = data;
+    let result: string = data;
     result = result.replace(PII_PATTERNS.email, '[REDACTED_EMAIL]');
     result = result.replace(PII_PATTERNS.phone, '[REDACTED_PHONE]');
     result = result.replace(PII_PATTERNS.ssn, '[REDACTED_SSN]');
-    return result as T;
+    return result as unknown as T;
   }
 
   if (typeof data !== 'object') {

@@ -240,6 +240,9 @@ describe('V1-02: API Key Validation', () => {
 
       await validateApiKey(generated.key);
 
+      // Small delay to allow async usage update to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const updated = await prisma.apiKey.findUnique({
         where: { id: apiKey.id },
       });
@@ -264,6 +267,9 @@ describe('V1-02: API Key Validation', () => {
       await validateApiKey(generated.key);
       await validateApiKey(generated.key);
       await validateApiKey(generated.key);
+
+      // Small delay to allow async usage updates to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       const updated = await prisma.apiKey.findUnique({
         where: { id: apiKey.id },

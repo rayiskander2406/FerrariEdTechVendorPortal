@@ -126,7 +126,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Validate batch schema
         const parseResult = BatchMessageSchema.safeParse(body);
         if (!parseResult.success) {
-          const issues = parseResult.error.issues || parseResult.error.errors || [];
+          const issues = parseResult.error.issues;
           return NextResponse.json(
             {
               error: issues[0]?.message || 'Invalid request',
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Validate single message schema
         const parseResult = SingleMessageSchema.safeParse(body);
         if (!parseResult.success) {
-          const issues = parseResult.error.issues || parseResult.error.errors || [];
+          const issues = parseResult.error.issues;
           return NextResponse.json(
             {
               error: issues[0]?.message || 'Invalid request',

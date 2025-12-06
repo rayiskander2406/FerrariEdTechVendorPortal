@@ -94,13 +94,14 @@ export const PRICING_TIERS: PricingTier[] = [
 export function getTierForVolume(volume: number): PricingTier {
   // Find the highest tier the volume qualifies for
   for (let i = PRICING_TIERS.length - 1; i >= 0; i--) {
-    if (volume >= PRICING_TIERS[i].minVolume) {
-      return PRICING_TIERS[i];
+    const tier = PRICING_TIERS[i]!;
+    if (volume >= tier.minVolume) {
+      return tier;
     }
   }
 
   // Default to starter tier
-  return PRICING_TIERS[0];
+  return PRICING_TIERS[0]!;
 }
 
 /**

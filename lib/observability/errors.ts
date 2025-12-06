@@ -92,13 +92,12 @@ export function captureError(
   context?: Record<string, unknown>,
   tags?: Record<string, string>
 ): string | undefined {
-  const options: Sentry.CaptureContext | undefined =
-    context || tags
-      ? {
-          extra: context,
-          tags,
-        }
-      : undefined;
+  const options = context || tags
+    ? {
+        extra: context,
+        tags,
+      }
+    : undefined;
 
   return Sentry.captureException(error, options);
 }
@@ -186,18 +185,26 @@ export function addErrorBreadcrumb(breadcrumb: Breadcrumb): void {
 // =============================================================================
 
 /**
- * Start a performance transaction
+ * Start a performance span
+ *
+ * Note: The old Transaction API is deprecated. This now uses startSpan internally.
  *
  * @param config - Transaction configuration
- * @returns Transaction object
+ * @param callback - Function to execute within the span
+ * @returns Result of the callback
  */
-export function startPerformanceTransaction(
-  config: TransactionConfig
-): Sentry.Transaction {
-  return Sentry.startTransaction({
-    name: config.name,
-    op: config.op,
-  });
+export function startPerformanceTransaction<T>(
+  config: TransactionConfig,
+  callback?: () => T
+): T | undefined {
+  if (callback) {
+    return Sentry.startSpan(
+      { name: config.name, op: config.op },
+      callback
+    );
+  }
+  // For backward compatibility, just return undefined if no callback
+  return undefined;
 }
 
 // =============================================================================

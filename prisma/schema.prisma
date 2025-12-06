@@ -1217,6 +1217,7 @@ model CommunicationMessage {
   sentAt        DateTime?
   deliveredAt   DateTime?
   failureReason String?
+  retryCount    Int       @default(0)
 
   // Standard timestamps
   createdAt DateTime  @default(now())

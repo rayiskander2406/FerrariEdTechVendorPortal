@@ -532,7 +532,7 @@ describe('Generated: ${testName}', () => {
       transitionMap.get(t.from)!.push(t.to);
     }
 
-    for (const [from, tos] of transitionMap) {
+    for (const [from, tos] of Array.from(transitionMap.entries())) {
       tests.push(`    ['${from}', new Set(${JSON.stringify(tos)})],
 `);
     }

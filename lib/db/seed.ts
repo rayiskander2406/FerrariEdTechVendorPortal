@@ -295,7 +295,7 @@ async function seedUsers(
   const studentIds = new Map<string, string[]>();
   const teacherIds = new Map<string, string[]>();
 
-  for (const [schoolKey, schoolId] of schoolMap) {
+  for (const [schoolKey, schoolId] of Array.from(schoolMap.entries())) {
     const def = SCHOOLS.find(s => s.id === schoolKey);
     if (!def) continue;
 
@@ -307,7 +307,7 @@ async function seedUsers(
 
     // Create students
     for (let i = 0; i < studentCount; i++) {
-      const firstName = FIRST_NAMES[Math.floor(random() * FIRST_NAMES.length)];
+      const firstName = FIRST_NAMES[Math.floor(random() * FIRST_NAMES.length)]!;
       const gradeLevel = def.gradeMin + Math.floor(random() * (def.gradeMax - def.gradeMin + 1));
       const token = studentToken(schoolKey, i);
 
@@ -327,7 +327,7 @@ async function seedUsers(
 
     // Create teachers
     for (let i = 0; i < teacherCount; i++) {
-      const firstName = TEACHER_FIRST_NAMES[Math.floor(random() * TEACHER_FIRST_NAMES.length)];
+      const firstName = TEACHER_FIRST_NAMES[Math.floor(random() * TEACHER_FIRST_NAMES.length)]!;
       const token = teacherToken(schoolKey, i);
 
       const user = await upsertUser({
@@ -363,7 +363,7 @@ async function seedClasses(
 ): Promise<Map<string, { classId: string; gradeLevel: string }[]>> {
   const classMap = new Map<string, { classId: string; gradeLevel: string }[]>();
 
-  for (const [schoolKey, schoolId] of schoolMap) {
+  for (const [schoolKey, schoolId] of Array.from(schoolMap.entries())) {
     const def = SCHOOLS.find(s => s.id === schoolKey);
     if (!def) continue;
 
@@ -373,7 +373,7 @@ async function seedClasses(
       const gradeLabel = grade === 0 ? 'K' : grade.toString();
 
       for (let period = 1; period <= SEED_CONFIG.classesPerGrade; period++) {
-        const subject = SUBJECTS[Math.floor(random() * SUBJECTS.length)];
+        const subject = SUBJECTS[Math.floor(random() * SUBJECTS.length)]!;
         const courseId = courseMap.get(subject);
         const classCode = `${subject.substring(0, 3).toUpperCase()}${gradeLabel}P${period}`;
 
@@ -420,7 +420,7 @@ async function seedEnrollments(
 
   const studentGrades = new Map(students.map(s => [s.id, s.gradeLevel]));
 
-  for (const [schoolKey, schoolStudentIds] of studentIds) {
+  for (const [schoolKey, schoolStudentIds] of Array.from(studentIds.entries())) {
     const schoolClasses = classMap.get(schoolKey) || [];
 
     for (const studentId of schoolStudentIds) {
