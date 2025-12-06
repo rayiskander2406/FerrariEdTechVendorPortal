@@ -1,6 +1,6 @@
 # PLANNING - SchoolDay Vendor Portal
 
-**Last Updated**: December 2, 2025
+**Last Updated**: December 5, 2025
 **Mission**: Disrupt Clever and become the dominant K-12 integration platform in 18 months
 **Version**: MVP ✅ → v1.0-hardening 🚧 → v1.0 → v2.0 → v3.0 (Market Leader)
 
@@ -16,7 +16,7 @@
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║                                                                          ║
 ║  GOAL: Implement production-ready database schema with all 20 mitigations║
-║  STATUS: 🚧 In Progress                                                  ║
+║  STATUS: ✅ P1 Complete (5/5) - P2/P3 optional                           ║
 ║                                                                          ║
 ║  CONTEXT:                                                                ║
 ║  ────────                                                                ║
@@ -26,19 +26,22 @@
 ║  • Vault schema created: prisma/vault.schema.prisma (6 models)           ║
 ║                                                                          ║
 ║  ┌────────────────────────────────────────────────────────────────────┐ ║
-║  │ COMPLETED                          │ REMAINING                     │ ║
+║  │ COMPLETED (P1+P2)                  │ OPTIONAL (P2/P3)              │ ║
 ║  ├────────────────────────────────────┼───────────────────────────────┤ ║
-║  │ ✅ Expert schema review            │ 📋 HARD-01: PostgreSQL setup  │ ║
-║  │    14 concerns identified          │    docker-compose.yml         │ ║
-║  │ ✅ Mitigation plan (20 items)      │ 📋 HARD-02: Run migrations    │ ║
-║  │    6 expert additions              │    npx prisma migrate dev     │ ║
-║  │ ✅ Main Prisma schema              │ 📋 HARD-03: Vault database    │ ║
-║  │    36 models, all mitigations      │    Separate Prisma client     │ ║
-║  │ ✅ Vault schema                    │ 📋 HARD-04: Update app code   │ ║
-║  │    6 security models               │    Use new schema in app      │ ║
-║  │                                    │ 📋 HARD-05: Seed demo data    │ ║
-║  │                                    │    LAUSD 5 schools + students │ ║
+║  │ ✅ Expert schema review            │ ✅ HARD-07: Circuit breaker   │ ║
+║  │ ✅ Mitigation plan (20 items)      │ ✅ HARD-08: SyncJob infra(P3) │ ║
+║  │ ✅ Main Prisma schema (36 models)  │                               │ ║
+║  │ ✅ Vault schema (6 models)         │                               │ ║
+║  │ ✅ HARD-01: PostgreSQL setup       │                               │ ║
+║  │ ✅ HARD-02: Migrations applied     │                               │ ║
+║  │ ✅ HARD-03: Vault infrastructure   │                               │ ║
+║  │ ✅ HARD-04: Entity operations      │                               │ ║
+║  │ ✅ HARD-05: LAUSD seed data        │                               │ ║
+║  │ ✅ HARD-06: Read replica (P2)      │                               │ ║
+║  │ ✅ HARD-09: Rate limiting (P3)     │                               │ ║
 ║  └────────────────────────────────────┴───────────────────────────────┘ ║
+║                                                                          ║
+║  TESTS: 2503 passing | COVERAGE: 80%+ on hardening files                 ║
 ║                                                                          ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
@@ -49,11 +52,13 @@
 |------|----------|------|--------|
 | **SCHEMA** | All 36 main + 6 vault models defined | Schema validation | ✅ Pass |
 | **MITIGATIONS** | All 20 mitigations applied | Code review | ✅ Pass |
-| **POSTGRESQL** | PostgreSQL runs locally via Docker | `docker-compose up` | 📋 Pending |
-| **MIGRATION** | Migrations run without errors | `npx prisma migrate dev` | 📋 Pending |
-| **VAULT** | Separate vault database configured | Vault client test | 📋 Pending |
-| **SEED** | Demo data seeded successfully | Query test | 📋 Pending |
-| **TESTS** | Existing 2050 tests still pass | `npm test` | 📋 Pending |
+| **POSTGRESQL** | PostgreSQL runs locally via Docker | `docker-compose up` | ✅ Pass |
+| **MIGRATION** | Migrations run without errors | `npx prisma migrate dev` | ✅ Pass |
+| **VAULT** | Separate vault database configured | Vault client test | ✅ Pass |
+| **SEED** | Demo data seeded successfully | Query test | ✅ Pass |
+| **TESTS** | All tests pass (2503 passing) | `npm test` | ✅ Pass |
+
+**All gates passed on December 5, 2025. Ready for v1.0 development.**
 
 ### v1.0-hardening Requirements
 
@@ -62,56 +67,60 @@
 ║                    v1.0-HARDENING REQUIREMENTS                            ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 
-  MUST HAVE (P1) - Block release if not done
+  MUST HAVE (P1) - ✅ ALL COMPLETE
   ────────────────────────────────────────────
-  📋 HARD-01: Set up PostgreSQL for local development
-     - Create docker-compose.yml with PostgreSQL 15
-     - Configure main database (schoolday_dev)
-     - Configure vault database (schoolday_vault)
-     - Update .env files with connection strings
+  ✅ HARD-01: Set up PostgreSQL for local development
+     - docker-compose.yml with PostgreSQL 15 Alpine
+     - Main database on port 5434, vault on port 5433
+     - .env.local configured with connection strings
 
-  📋 HARD-02: Create and run initial migrations
-     - Generate Prisma client for main schema
-     - Run npx prisma migrate dev --name init
-     - Verify all 36 models created in database
+  ✅ HARD-02: Create and run initial migrations
+     - Main schema: 3 migrations applied (36 models)
+     - Vault schema: 2 migrations applied (6 models)
+     - Both Prisma clients generated
 
-  📋 HARD-03: Implement vault database infrastructure
-     - Create separate Prisma client for vault
-     - Configure vault connection in lib/vault/client.ts
-     - Implement TokenMapping CRUD operations
-     - Add TokenAccessLog on all vault operations
+  ✅ HARD-03: Implement vault database infrastructure
+     - lib/vault/client.ts - Vault Prisma client
+     - lib/vault/operations.ts - tokenize/detokenize
+     - lib/vault/rate-limit.ts - Rate limiting (also satisfies HARD-09)
+     - lib/vault/alerts.ts - Security alerts
+     - 40 tests added
 
-  📋 HARD-04: Update application code to use new schema
-     - Update lib/db/index.ts for new models
-     - Ensure backward compatibility with existing API
-     - Update synthetic data generator for new models
+  ✅ HARD-04: Update application code to use new schema
+     - lib/db/entities.ts - CRUD for District, School, User, Class, etc.
+     - Backward compatible with existing API
+     - 34 tests added
 
-  📋 HARD-05: Seed demo data for LAUSD
-     - 1 District (LAUSD)
-     - 5 Schools (matching current demo)
-     - AcademicSession for 2024-2025
-     - 1000 Users (students + teachers)
-     - Classes and Enrollments
+  ✅ HARD-05: Seed demo data for LAUSD
+     - 1 District (LAUSD), 5 Schools
+     - 610 students + 26 teachers (tokenized)
+     - Academic sessions, courses, classes, enrollments
+     - npm run db:seed command added
+     - 17 tests added
 
   SHOULD HAVE (P2) - Improve quality but not blocking
   ─────────────────────────────────────────────────────
-  📋 HARD-06: Add read replica configuration
-     - Create prismaRead client for list operations
-     - Document when to use primary vs replica
+  ✅ HARD-06: Add read replica configuration (Done Dec 5)
+     - lib/db/replica.ts - prismaRead client for list operations
+     - Fallback pattern for resilience
+     - 19 tests added
 
-  📋 HARD-07: Implement circuit breaker for external services
-     - Initialize ExternalServiceHealth records
-     - Add health check endpoints
+  ✅ HARD-07: Implement circuit breaker for external services (Done Dec 5)
+     - lib/circuit-breaker/index.ts - Full circuit breaker pattern
+     - app/api/health/external/route.ts - Health check endpoints
+     - 34 tests added
 
   NICE TO HAVE (P3) - If time permits
   ────────────────────────────────────
-  📋 HARD-08: Implement SyncJob infrastructure
-     - Create sync service scaffold
-     - Add idempotency key validation
+  ✅ HARD-08: Implement SyncJob infrastructure (Done Dec 5)
+     - lib/sync/index.ts - Full sync job management
+     - Idempotency key generation and validation (Mitigation #16)
+     - Progress tracking, error recording, resolution workflow
+     - 55 tests added
 
-  📋 HARD-09: Add vault rate limiting middleware
-     - Implement checkRateLimit() function
-     - Add security alerts for threshold breach
+  ✅ HARD-09: Add vault rate limiting middleware (Done in HARD-03)
+     - checkRateLimit() implemented in lib/vault/rate-limit.ts
+     - Security alerts for threshold breach in lib/vault/alerts.ts
 
   OUT OF SCOPE (Deferred to v1.0)
   ────────────────────────────────
@@ -685,25 +694,37 @@ export type FormId = typeof FORM_TYPES[keyof typeof FORM_TYPES]["id"];
      - Conversation history persistence
      - Session cleanup cron job
 
-  📋 V1-05: CPaaS Message Queue (Days 6-7)
-     - BullMQ + Redis queue
+  ✅ V1-05: CPaaS Message Queue (Days 6-7) - COMPLETED
+     - BullMQ + Redis queue with retry logic
      - Send endpoint POST /api/cpaas/messages
-     - Delivery status tracking
+     - Delivery status tracking & webhooks
+     - Circuit breaker pattern for providers
+     - 101 tests passing
 
-  📋 V1-06: Pricing Engine (Day 7)
-     - Volume-based tiered pricing
-     - Monthly usage tracking
-     - Cost calculation per message
+  ✅ V1-06: Pricing Engine (Day 7) - COMPLETED
+     - Volume-based tiered pricing (5 tiers)
+     - Monthly usage tracking per vendor
+     - Cost calculation per message per channel
+     - 62 tests passing
 
-  📋 V1-07: Observability Stack (Days 9-10)
-     - Pino structured logging
-     - Request context + tracing
-     - Sentry error tracking
-     - Prometheus metrics endpoint
+  ✅ V1-07: Observability Stack (Days 9-10) - COMPLETED
+     - Pino structured logging with PII redaction
+     - Request context + child loggers
+     - Sentry error tracking with vendor context
+     - Prometheus metrics endpoint (/api/metrics)
+     - Health check endpoints (/api/health, /api/health/ready, /api/health/live)
+     - 84 tests passing
 
   SHOULD HAVE (P2) - Improve quality but not blocking
   ─────────────────────────────────────────────────────
-  📋 V1-08: Audit logging for all mutations
+  ✅ V1-08: Audit Logging - COMPLETED
+     - lib/audit/* module with logAudit, getAuditLogs, deleteExpiredAuditLogs
+     - GET /api/audit with filtering, pagination, vendor isolation
+     - GET /api/audit/:id for single log retrieval
+     - PII redaction in details (passwords, keys, secrets)
+     - 'audit' scope added to API key permissions
+     - 46 tests passing
+
   📋 V1-09: Environment configuration with Zod validation
   📋 V1-10: Integration tests for all API endpoints
 
@@ -2642,52 +2663,8 @@ Leaves buffer for go-to-market, sales, support
 | Nov 28 | Free Privacy-Safe tier | Disrupt Clever's vendor-pays model |
 | Nov 28 | 18-month disruption target | Aggressive but achievable with focus |
 | Nov 28 | Open standards for SSO | SAML/OIDC are industry standards; avoid Clever-style proprietary lock-in |
-| Dec 2 | **LAUSD Video Pitch v1.0 Initiated** | 90-second explainer video for Superintendent. MVP complete (script, storyboard, TTS voiceover, Remotion animations). v1.0 refinements: fix pronunciation (EdTech→EdTek, LAUSD→L.A.U.S.D.), 1.5X audio speed, add tokenized communication value prop, add integration breadth (SSO/LTI/Rostering). 7 tasks (VP-01 to VP-07), ~2 hours total. See `video-pitch/VIDEO_PITCH_PLAN.md`. |
-
----
-
-## Strategic Initiatives: LAUSD Video Pitch
-
-```
-╔══════════════════════════════════════════════════════════════════════════╗
-║                    LAUSD VIDEO PITCH v1.0                                ║
-╠══════════════════════════════════════════════════════════════════════════╣
-║                                                                          ║
-║  GOAL: 90-second explainer video for LAUSD Superintendent                ║
-║  PURPOSE: Highlight SchoolDay value props, demand vendor discounts       ║
-║  STATUS: 🚧 v1.0 refinement in progress                                  ║
-║                                                                          ║
-║  KEY VALUE PROPOSITIONS:                                                 ║
-║  • Speed: 13 questions, 2 minutes → instant approval (vs weeks)          ║
-║  • Security: Tokenization = zero PII exposure                            ║
-║  • Compliance: FERPA/COPPA/CA Ed Code built-in, full audit trails        ║
-║  • Cost: No Clever fees ($16-19/school/month saved)                      ║
-║  • Communication: Tokenized relay for email/SMS (NEW in v1.0)            ║
-║  • Integration: SSO + Rostering + LTI + API (NEW in v1.0)                ║
-║  • Leverage: Demand significant vendor discounts                         ║
-║                                                                          ║
-║  TECH STACK:                                                             ║
-║  • Voiceover: Coqui TTS (open-source, local)                             ║
-║  • Video: Remotion (React-based motion graphics)                         ║
-║  • Audio: FFmpeg for 1.5X speed                                          ║
-║                                                                          ║
-║  FILES:                                                                  ║
-║  📂 video-pitch/VIDEO_PITCH_PLAN.md    # Full project plan               ║
-║  📂 video-pitch/SCRIPT.md              # Phonetic script                 ║
-║  📂 video-pitch/STORYBOARD.md          # Visual directions               ║
-║  📂 video-pitch/schoolday-pitch/       # Remotion project                ║
-║                                                                          ║
-║  v1.0 TASKS (7 items, ~2 hours):                                         ║
-║  📋 VP-01: Fix pronunciation (EdTech→EdTek, LAUSD→L.A.U.S.D.)            ║
-║  📋 VP-02: Speed up voiceover to 1.5X                                    ║
-║  📋 VP-03: Add tokenized communication value prop                        ║
-║  📋 VP-04: Add integration breadth value prop                            ║
-║  📋 VP-05: Regenerate all voiceover files                                ║
-║  📋 VP-06: Update Remotion scenes                                        ║
-║  📋 VP-07: Final render to MP4                                           ║
-║                                                                          ║
-╚══════════════════════════════════════════════════════════════════════════╝
-```
+| Dec 2 | **LAUSD Video Pitch** | Incubated → Graduated to standalone `myPitchEngine` repo (Dec 4) |
+| Dec 4 | **Disincubated video-pitch** | Moved to ~/myPitchEngine as standalone project |
 
 ---
 

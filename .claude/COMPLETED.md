@@ -8,6 +8,100 @@
 
 ### Week of Dec 1
 
+#### Dec 6 - V1-09: Environment Configuration with Zod Validation
+
+**Task ID**: V1-09
+
+**Completed:**
+- [x] Researched existing env var usage across codebase
+- [x] Created comprehensive TDD test suite (69 tests)
+- [x] Implemented Zod env schema with type coercion
+- [x] Added production/development/test environment requirements
+- [x] Added service-specific helpers (hasUpstashRedis, hasSentry, etc.)
+
+**Key Deliverables:**
+- `lib/config/env.ts` - Environment configuration module
+- `tests/v1-09/env-config.test.ts` - 69 comprehensive tests
+
+**Features:**
+- Type-safe environment variable access with `getEnv()`
+- Zod validation for all env vars with helpful error messages
+- Boolean coercion from strings ('true', '1', 'yes')
+- Port number validation (1-65535)
+- PostgreSQL URL format validation
+- Production requirements enforcement (DATABASE_URL, ANTHROPIC_API_KEY required)
+- Development flexibility (USE_MOCK_DB bypasses DATABASE_URL requirement)
+- Environment helpers: `isProduction()`, `isDevelopment()`, `isTest()`
+- Service detection: `hasUpstashRedis()`, `hasSentry()`, `hasSendGrid()`, `hasTwilio()`
+- Cached validation for performance
+- `requireEnv()` helper for one-off env var access
+
+**Test Results:**
+```
+82 test files: 82 passed
+3084 tests: 3084 passed (was 2919)
+Duration: ~47s
+```
+
+**Usage Example:**
+```typescript
+import { getEnv, isProduction, hasAnthropicApi } from '@/lib/config/env';
+
+const env = getEnv();
+console.log(env.DATABASE_URL); // Type-safe access
+
+if (isProduction() && !hasAnthropicApi()) {
+  throw new Error('API key required in production');
+}
+```
+
+---
+
+#### Dec 5 - v1.0 Hardening: Database Schema Implementation Complete
+
+**Task ID**: HARD-01 through HARD-05 (P1 Complete)
+
+**Completed:**
+- [x] HARD-01: PostgreSQL setup with docker-compose.yml
+- [x] HARD-02: Database migrations (main: 36 models, vault: 6 models)
+- [x] HARD-03: Vault database infrastructure with rate limiting
+- [x] HARD-04: Entity operations (District, School, User, Class, Enrollment)
+- [x] HARD-05: LAUSD seed data (610 students, 26 teachers, 5 schools)
+- [x] HARD-09: Vault rate limiting (completed as part of HARD-03)
+
+**Key Deliverables:**
+- `docker-compose.yml` - PostgreSQL 15 Alpine (main:5434, vault:5433)
+- `lib/vault/client.ts` - Vault Prisma client + types
+- `lib/vault/operations.ts` - tokenize, detokenize, lookup, bulkTokenize
+- `lib/vault/rate-limit.ts` - Sliding window rate limiting
+- `lib/vault/alerts.ts` - Security alert triggers
+- `lib/db/entities.ts` - CRUD operations for new schema models
+- `lib/db/seed.ts` - LAUSD demo data seeder
+- `tests/hard-01/` - 54 environment tests
+- `tests/hard-03/` - 40 vault operation tests
+- `tests/hard-04/` - 34 entity operation tests
+- `tests/hard-05/` - 17 seed tests
+
+**Test Results:**
+```
+61 test files: 61 passed
+2395 tests: 2395 passed (was 2050)
+Duration: ~52s
+```
+
+**Coverage (v1.0-hardening files):**
+- lib/db/entities.ts: 80.55% statements
+- lib/db/seed.ts: 88.88% statements
+- lib/vault/client.ts: 83.33% statements
+- lib/vault/rate-limit.ts: 81.39% statements
+
+**npm Scripts Added:**
+- `npm run db:seed` - Seed LAUSD demo data
+- `npm run db:seed:clear` - Clear seeded data
+- `npm run db:seed:reseed` - Clear and re-seed
+
+---
+
 #### Dec 1 - v1.0 Hardening: Database-First Pattern & SSO Bug Fix
 
 **Task ID**: HARD-01 through HARD-04
@@ -291,11 +385,13 @@ Duration: 45ms
 
 | Metric | Value |
 |--------|-------|
-| Total tasks completed | 13 |
-| Current sprint | v1.0 Hardening |
-| Days in current sprint | 1 |
-| Total tests | 2050 |
+| Total tasks completed | 19 |
+| Current sprint | v1.0-hardening (P1 Complete) |
+| Days in current sprint | 6 |
+| Total tests | 3084 |
 | Demo workflows validated | 5/5 |
+| v1.0-hardening P1 tasks | 5/5 ✅ |
+| v1.0 P2 tasks | 2/3 ✅ |
 
 ---
 

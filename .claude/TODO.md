@@ -1,12 +1,38 @@
 # TODO - SchoolDay Vendor Portal
 
-**Last Updated**: November 30, 2025
+**Last Updated**: December 5, 2025
 
 This is the **master task list** for the SchoolDay Vendor Integration Portal.
 
 ---
 
 ## Active Focus
+
+### Current Sprint: v1.0-hardening (P1 Complete!)
+**Goal**: Implement production-ready database schema with all 20 mitigations
+**Status**: ✅ P1 Complete (5/5) - P2/P3 optional
+**Tests**: 3084 passing (was 2919)
+
+| Task ID | Task | Status | Priority | Tests |
+|---------|------|--------|----------|-------|
+| HARD-01 | PostgreSQL setup (docker-compose) | ✅ Complete | P1 | 54 |
+| HARD-02 | Run migrations (main + vault) | ✅ Complete | P1 | 2 |
+| HARD-03 | Vault database infrastructure | ✅ Complete | P1 | 40 |
+| HARD-04 | Entity operations (entities.ts) | ✅ Complete | P1 | 34 |
+| HARD-05 | Seed LAUSD demo data | ✅ Complete | P1 | 17 |
+| HARD-06 | Read replica configuration | ✅ Complete | P2 | 19 |
+| HARD-07 | Circuit breaker for external services | ✅ Complete | P2 | 34 |
+| HARD-08 | SyncJob infrastructure | ✅ Complete | P3 | 55 |
+| HARD-09 | Vault rate limiting | ✅ Complete | P3 | (in HARD-03) |
+
+**Key Deliverables:**
+- `docker-compose.yml` - PostgreSQL 15 Alpine (main:5434, vault:5433)
+- `lib/vault/*` - Vault client, operations, rate-limit, alerts
+- `lib/db/entities.ts` - CRUD for District, School, User, Class, Enrollment
+- `lib/db/seed.ts` - LAUSD seeder (610 students, 26 teachers, 5 schools)
+- `npm run db:seed` - Seed command
+
+---
 
 ### Previous Sprint: Integration Layer Bugfixes (Complete)
 **Goal**: Fix 6 critical bugs blocking demo reliability
@@ -77,17 +103,17 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 
 > **Technical Spec**: See [ARCHITECTURE_SPEC.md](./ARCHITECTURE_SPEC.md) for implementation details
 
-| Task ID | Task | Priority | Days | Notes |
-|---------|------|----------|------|-------|
-| V1-01 | PostgreSQL + Prisma schema | P1 | 2 | Vendor, Integration, Credential, ApiKey, Message, AuditLog models |
-| V1-02 | API Key authentication | P1 | 1 | SHA-256 hashed keys, Bearer auth, scope-based permissions |
-| V1-03 | Rate limiting (Upstash) | P1 | 0.5 | Tier-based: 100/500/1000 req/min |
-| V1-04 | Vendor Session layer | P1 | 2 | State persistence, conversation history, cleanup cron |
-| V1-05 | CPaaS message queue | P1 | 2 | BullMQ, POST /api/cpaas/messages, delivery tracking |
-| V1-06 | Pricing engine | P1 | 1 | Volume-based tiered pricing, usage tracking |
-| V1-07 | Observability stack | P1 | 2 | Pino logging, Sentry, Prometheus metrics |
-| V1-08 | Audit logging | P2 | 0.5 | All mutations logged to audit table |
-| V1-09 | Environment config | P2 | 0.5 | Zod validation for all env vars |
+| Task ID | Task | Priority | Days | Status | Notes |
+|---------|------|----------|------|--------|-------|
+| V1-01 | PostgreSQL + Prisma schema | P1 | 2 | ✅ Complete | Via v1.0-hardening sprint |
+| V1-02 | API Key authentication | P1 | 1 | ✅ Complete | 92 tests, lib/auth/*, /api/auth/keys/* |
+| V1-03 | Rate limiting (Upstash) | P1 | 0.5 | ✅ Complete | 69 tests, lib/rate-limit/*, tier-based: 100/500/1000 req/min |
+| V1-04 | Vendor Session layer | P1 | 2 | ✅ Complete | 74 tests, lib/session/*, 24h expiry, conversation history |
+| V1-05 | CPaaS message queue | P1 | 2 | ✅ Complete | 92 tests, lib/cpaas/*, POST /api/cpaas/messages, delivery tracking |
+| V1-06 | Pricing engine | P1 | 1 | ✅ Complete | 90 tests, lib/pricing/*, 4-tier volume discounts, usage tracking |
+| V1-07 | Observability stack | P1 | 2 | ✅ Complete | 84 tests, lib/observability/*, /api/health, /api/metrics |
+| V1-08 | Audit logging | P2 | 0.5 | ✅ Complete | 46 tests, lib/audit/*, /api/audit endpoint, vendor isolation |
+| V1-09 | Environment config | P2 | 0.5 | ✅ Complete | 69 tests, lib/config/env.ts, type-safe env access |
 | V1-10 | Integration tests | P2 | 1 | All API endpoints covered |
 | V1-11 | E2E tests with Playwright | P3 | 1 | Critical paths covered |
 | V1-12 | k6 load testing scripts | P3 | 0.5 | Performance baselines |
@@ -154,6 +180,21 @@ The following moonshot features can be enabled via `/features`:
 
 | Date | Task ID | Task | Notes |
 |------|---------|------|-------|
+| Dec 6 | V1-09 | Environment Config | 69 tests, lib/config/env.ts, Zod validation, type-safe env access, production/dev/test requirements |
+| Dec 5 | V1-08 | Audit Logging | 46 tests, lib/audit/*, /api/audit endpoint with auth, vendor isolation, query filtering, PII redaction in details |
+| Dec 5 | V1-07 | Observability Stack | 84 tests, lib/observability/*, Pino logging with PII redaction, Sentry error tracking, Prometheus metrics, /api/health + /api/metrics endpoints |
+| Dec 5 | V1-06 | Pricing Engine | 90 tests, lib/pricing/*, 4-tier volume pricing (STARTER/GROWTH/SCALE/ENTERPRISE), usage tracking per vendor/month |
+| Dec 5 | V1-05 | CPaaS Message Queue | 92 tests, lib/cpaas/*, POST /api/cpaas/messages, batch messaging, delivery webhooks, retry with exponential backoff |
+| Dec 5 | V1-04 | Vendor Session layer | 74 tests, lib/session/*, withSession/withAuthAndSession middleware, 24h expiry + 1h extension |
+| Dec 5 | V1-03 | Rate limiting (Upstash) | 69 tests, lib/rate-limit/*, tier-based: PRIVACY_SAFE 100/min, SELECTIVE 500/min, FULL_ACCESS 1000/min |
+| Dec 5 | HARD-08 | SyncJob infrastructure | 55 tests, lib/sync/index.ts, idempotency support |
+| Dec 5 | HARD-07 | Circuit breaker for external services | 34 tests, lib/circuit-breaker/index.ts, API endpoint |
+| Dec 5 | HARD-06 | Read replica configuration | 19 tests, lib/db/replica.ts, prismaRead client |
+| Dec 5 | HARD-05 | Seed LAUSD demo data | 17 tests, lib/db/seed.ts, npm run db:seed |
+| Dec 5 | HARD-04 | Entity operations | 34 tests, lib/db/entities.ts |
+| Dec 5 | HARD-03 | Vault database infrastructure | 40 tests, lib/vault/*, rate limiting, alerts |
+| Dec 5 | HARD-02 | Run migrations | Main (36 models) + Vault (6 models) |
+| Dec 5 | HARD-01 | PostgreSQL setup | docker-compose.yml, main:5434, vault:5433 |
 | Nov 30 | MVP-06 | CPaaS demo polish (CommTestForm) | 205 tests: lib/config/cpaas.ts SSOT, cost preview, delivery status simulation, privacy explainer, scale calculator |
 | Nov 30 | MVP-05 | Form triggers ([FORM:*]) | 103 tests (unit + integration) |
 | Nov 30 | MVP-04 | Streaming response tests | 188 tests (backend, frontend, integration) |
@@ -180,8 +221,9 @@ The following moonshot features can be enabled via `/features`:
 | Version | Description | Status |
 |---------|-------------|--------|
 | MVP | Demo-ready for LAUSD presentations | ✅ Complete (10/10) - 1070 tests |
+| v1.0-hardening | Database schema implementation | ✅ ALL COMPLETE (9/9) - 2829 tests |
 | TEST-INFRA | Testing infrastructure sprint | 📋 Planned (2-3 days) |
-| v1.0 | Production-ready with PostgreSQL | 📋 Planned |
+| v1.0 | Production-ready with auth & rate limiting | 📋 Planned |
 | v1.5 | Multi-protocol sandbox suite | 📋 Planned |
 | v2.0 | Full moonshot features | 📋 Planned |
 
