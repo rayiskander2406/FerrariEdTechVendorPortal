@@ -11,7 +11,7 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 ### Current Sprint: v1.0-hardening (P1 Complete!)
 **Goal**: Implement production-ready database schema with all 20 mitigations
 **Status**: ✅ ALL Complete (9/9)
-**Tests**: 3192 passing
+**Tests**: 3222 passing
 
 | Task ID | Task | Status | Priority | Tests |
 |---------|------|--------|----------|-------|
@@ -91,11 +91,11 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 |---------|------|----------|--------|--------|-------|
 | TEST-01 | Standardize vitest environments | P1 | S | ✅ Complete | 23 tests, node + jsdom |
 | TEST-02 | Create tests/utils/ shared utilities | P1 | S | ✅ Complete | 30 tests, TestDataTracker, factories |
-| TEST-03 | Add contract tests for API routes | P1 | M | 📋 Planned | Route ↔ consumer, tool ↔ handler |
+| TEST-03 | Add contract tests for API routes | P1 | M | ✅ Complete | 29 tests, Zod schemas, TDD design |
 | TEST-04 | Document TESTING_PATTERNS.md | P2 | S | 📋 Planned | When static analysis vs runtime |
 | TEST-05 | Convert remaining complex mocks | P2 | M | 📋 Planned | Apply static analysis to sandbox/SSO |
 
-**Status**: 2/5 Complete | **Total Effort**: 2-3 days
+**Status**: 3/5 Complete | **Total Effort**: 2-3 days
 
 ---
 
@@ -180,6 +180,7 @@ The following moonshot features can be enabled via `/features`:
 
 | Date | Task ID | Task | Notes |
 |------|---------|------|-------|
+| Dec 6 | TEST-03 | Contract Tests | 29 tests, Zod schemas for API contracts, TDD design |
 | Dec 6 | V1-10 | Integration Tests | 20 tests, direct route handler testing, uses TEST-02 utilities |
 | Dec 6 | TEST-02 | Shared Test Utilities | 30 tests, TestDataTracker, createTestVendor/ApiKey, cleanupTestData |
 | Dec 6 | TEST-01 | Vitest Environments | 23 tests, node + jsdom environment standardization |
@@ -226,8 +227,8 @@ The following moonshot features can be enabled via `/features`:
 |---------|-------------|--------|
 | MVP | Demo-ready for LAUSD presentations | ✅ Complete (10/10) - 1070 tests |
 | v1.0-hardening | Database schema implementation | ✅ Complete (9/9) - 2829 tests |
-| TEST-INFRA | Testing infrastructure sprint | 🚧 In Progress (2/5) - 53 tests added |
-| v1.0 | Production-ready with auth & rate limiting | 🚧 In Progress (10/15) - 3192 tests |
+| TEST-INFRA | Testing infrastructure sprint | 🚧 In Progress (3/5) - 82 tests added |
+| v1.0 | Production-ready with auth & rate limiting | 🚧 In Progress (10/15) - 3222 tests |
 | v1.5 | Multi-protocol sandbox suite | 📋 Planned |
 | v2.0 | Full moonshot features | 📋 Planned |
 
