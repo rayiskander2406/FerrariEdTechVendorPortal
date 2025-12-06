@@ -32,7 +32,7 @@ const EXPECTED_CONFIG = {
   mainDbPort: 5434,
   vaultDbPort: 5433,
   defaultUser: 'schoolday',
-  composeVersion: '3.8',
+  // Note: 'version' is deprecated in Docker Compose v2+ and should be omitted
 } as const;
 
 // =============================================================================
@@ -257,9 +257,10 @@ describe('HARD-01: Docker Compose File Existence', () => {
     expect(typeof config).toBe('object');
   });
 
-  it('should have correct compose version', () => {
+  it('should not have deprecated version field (Docker Compose v2+)', () => {
     const config = parseDockerCompose(DOCKER_COMPOSE_PATH);
-    expect(config?.version).toBe(EXPECTED_CONFIG.composeVersion);
+    // The 'version' field is deprecated in Docker Compose v2+ and triggers warnings
+    expect(config?.version).toBeUndefined();
   });
 
   it('should define services section', () => {

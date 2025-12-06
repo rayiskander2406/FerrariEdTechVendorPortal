@@ -802,3 +802,67 @@ export async function seedDatabase(): Promise<void> {
 
   console.log(`[DB] Seeded database with sample vendor: ${sampleVendor.id}`);
 }
+
+// =============================================================================
+// ENTITY OPERATIONS (HARD-04)
+// =============================================================================
+
+// Re-export all entity operations for new schema models
+export {
+  // District
+  upsertDistrict,
+  getDistrict,
+  getDistrictByShortCode,
+  listDistricts,
+  // School
+  upsertSchool,
+  getSchool,
+  listSchoolsInDistrict,
+  getSchoolCount,
+  // User
+  upsertUser,
+  getUser,
+  getUserByToken,
+  listUsersByRole,
+  getUserCounts,
+  // Class
+  upsertClass,
+  getClass,
+  listClassesInSchool,
+  // Enrollment
+  upsertEnrollment,
+  getEnrollmentsForUser,
+  getEnrollmentsForClass,
+  getEnrollmentCount,
+  // Academic Session
+  upsertAcademicSession,
+  getCurrentAcademicSession,
+  // Course
+  upsertCourse,
+  listCourses,
+  // Bulk
+  clearAllEntityData,
+  getEntityStats,
+  // Types
+  type DistrictInput,
+  type SchoolInput,
+  type UserInput,
+  type ClassInput,
+  type EnrollmentInput,
+  type AcademicSessionInput,
+  type CourseInput,
+} from './entities';
+
+// =============================================================================
+// READ REPLICA (HARD-06)
+// =============================================================================
+
+// Re-export read replica client and utilities
+export {
+  prismaRead,
+  hasReadReplica,
+  getReplicaStatus,
+  isReplicaHealthy,
+  getReplicationLag,
+  readWithFallback,
+} from './replica';
