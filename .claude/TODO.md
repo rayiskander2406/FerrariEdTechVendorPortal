@@ -11,7 +11,7 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 ### Current Sprint: v1.0-hardening (P1 Complete!)
 **Goal**: Implement production-ready database schema with all 20 mitigations
 **Status**: ✅ ALL Complete (9/9)
-**Tests**: 3222 passing
+**Tests**: 3261 passing
 
 | Task ID | Task | Status | Priority | Tests |
 |---------|------|--------|----------|-------|
@@ -117,7 +117,7 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 | V1-10 | Integration tests | P2 | 1 | ✅ Complete | 20 tests, direct route handler testing |
 | V1-11 | E2E tests with Playwright | P3 | 1 | Critical paths covered |
 | V1-12 | k6 load testing scripts | P3 | 0.5 | Performance baselines |
-| V1-13 | CI/CD pipeline (GitHub Actions) | P3 | 1 | Auto-deploy to Vercel |
+| V1-13 | CI/CD pipeline (GitHub Actions) | P3 | 1 | ✅ Complete | 39 tests, .github/workflows/ci.yml, lint/test/build/security |
 | V1-14 | Provider abstraction (Vonage/Sinch) | P3 | 2 | Multi-provider routing, failover, rate optimization |
 | V1-15 | Margin tracking & cost optimization | P3 | 1 | Revenue vs provider cost, rate monitoring |
 
@@ -180,6 +180,7 @@ The following moonshot features can be enabled via `/features`:
 
 | Date | Task ID | Task | Notes |
 |------|---------|------|-------|
+| Dec 6 | V1-13 | CI/CD Pipeline | 39 tests, .github/workflows/ci.yml - lint, typecheck, tests, build, security |
 | Dec 6 | TEST-04 | Testing Patterns Documentation | docs/TESTING_PATTERNS.md - static analysis vs runtime, test data management, contract testing |
 | Dec 6 | TEST-03 | Contract Tests | 29 tests, Zod schemas for API contracts, TDD design |
 | Dec 6 | V1-10 | Integration Tests | 20 tests, direct route handler testing, uses TEST-02 utilities |
@@ -228,8 +229,8 @@ The following moonshot features can be enabled via `/features`:
 |---------|-------------|--------|
 | MVP | Demo-ready for LAUSD presentations | ✅ Complete (10/10) - 1070 tests |
 | v1.0-hardening | Database schema implementation | ✅ Complete (9/9) - 2829 tests |
-| TEST-INFRA | Testing infrastructure sprint | 🚧 In Progress (3/5) - 82 tests added |
-| v1.0 | Production-ready with auth & rate limiting | 🚧 In Progress (10/15) - 3222 tests |
+| TEST-INFRA | Testing infrastructure sprint | 🚧 In Progress (4/5) - 121 tests added |
+| v1.0 | Production-ready with auth & rate limiting | 🚧 In Progress (11/15) - 3261 tests |
 | v1.5 | Multi-protocol sandbox suite | 📋 Planned |
 | v2.0 | Full moonshot features | 📋 Planned |
 
