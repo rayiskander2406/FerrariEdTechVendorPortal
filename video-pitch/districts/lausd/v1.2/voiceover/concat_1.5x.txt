@@ -1,8 +1,0 @@
-file 'scene1_hook_1.5x.mp3'
-file 'scene1b_stats_1.5x.mp3'
-file 'scene2_problem_1.5x.mp3'
-file 'scene3_solution_1.5x.mp3'
-file 'scene4_integration_1.5x.mp3'
-file 'scene5_benefits_1.5x.mp3'
-file 'scene6_leverage_1.5x.mp3'
-file 'scene7_close_1.5x.mp3'

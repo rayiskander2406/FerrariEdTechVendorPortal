@@ -1,8 +1,0 @@
-file 'scene1_hook_v124.mp3'
-file 'scene1b_stats_v124b.mp3'
-file 'scene2_problem.mp3'
-file 'scene3_solution.mp3'
-file 'scene4_integration.mp3'
-file 'scene5_benefits.mp3'
-file 'scene6_leverage.mp3'
-file 'scene7_close.mp3'
