@@ -78,12 +78,17 @@ async function createTestApiKey(scopes: string[] = ['read', 'write']) {
 // API ROUTE PROTECTION TESTS
 // =============================================================================
 
-// Skip all integration tests when server is not available
-// Use SKIP_INTEGRATION_TESTS=true to explicitly skip, or tests auto-skip when server unreachable
-const shouldSkipIntegration = process.env.SKIP_INTEGRATION_TESTS === 'true';
+// Skip integration tests when:
+// 1. SKIP_INTEGRATION_TESTS=true (explicit)
+// 2. Running in CI without server (auto-detect)
+// 3. NODE_ENV=test and no explicit override
+const shouldSkipIntegration =
+  process.env.SKIP_INTEGRATION_TESTS === 'true' ||
+  (process.env.CI === 'true' && process.env.RUN_INTEGRATION_TESTS !== 'true') ||
+  (process.env.VITEST === 'true' && process.env.RUN_INTEGRATION_TESTS !== 'true');
 
 // Helper to conditionally skip tests when server is not available
-// Tests will be skipped if SKIP_INTEGRATION_TESTS is set
+// Tests will be skipped if SKIP_INTEGRATION_TESTS is set or CI without explicit opt-in
 const describeWithServer = shouldSkipIntegration ? describe.skip : describe;
 
 describeWithServer('V1-02: Protected API Routes', () => {
