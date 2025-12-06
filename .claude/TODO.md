@@ -1,6 +1,6 @@
 # TODO - SchoolDay Vendor Portal
 
-**Last Updated**: December 5, 2025
+**Last Updated**: December 6, 2025
 
 This is the **master task list** for the SchoolDay Vendor Integration Portal.
 
@@ -10,8 +10,8 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 
 ### Current Sprint: v1.0-hardening (P1 Complete!)
 **Goal**: Implement production-ready database schema with all 20 mitigations
-**Status**: ✅ P1 Complete (5/5) - P2/P3 optional
-**Tests**: 3084 passing (was 2919)
+**Status**: ✅ ALL Complete (9/9)
+**Tests**: 3192 passing
 
 | Task ID | Task | Status | Priority | Tests |
 |---------|------|--------|----------|-------|
@@ -87,15 +87,15 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 
 > **Strategic Value**: Systematize MVP-04 testing patterns for 150% ROI across v1.0 development
 
-| Task ID | Task | Priority | Effort | Notes |
-|---------|------|----------|--------|-------|
-| TEST-01 | Standardize vitest.config.ts environments | P1 | S | jsdom default, node for API |
-| TEST-02 | Create tests/helpers/ shared utilities | P1 | S | SSE mocks, flexible matchers, static analysis |
-| TEST-03 | Add contract tests for API routes | P1 | M | Route ↔ consumer, tool ↔ handler |
-| TEST-04 | Document TESTING_PATTERNS.md | P2 | S | When static analysis vs runtime |
-| TEST-05 | Convert remaining complex mocks | P2 | M | Apply static analysis to sandbox/SSO |
+| Task ID | Task | Priority | Effort | Status | Notes |
+|---------|------|----------|--------|--------|-------|
+| TEST-01 | Standardize vitest environments | P1 | S | ✅ Complete | 23 tests, node + jsdom |
+| TEST-02 | Create tests/utils/ shared utilities | P1 | S | ✅ Complete | 30 tests, TestDataTracker, factories |
+| TEST-03 | Add contract tests for API routes | P1 | M | 📋 Planned | Route ↔ consumer, tool ↔ handler |
+| TEST-04 | Document TESTING_PATTERNS.md | P2 | S | 📋 Planned | When static analysis vs runtime |
+| TEST-05 | Convert remaining complex mocks | P2 | M | 📋 Planned | Apply static analysis to sandbox/SSO |
 
-**Total Effort**: 2-3 days | **ROI**: Invest 2 days → Save 3+ days across v1.0
+**Status**: 2/5 Complete | **Total Effort**: 2-3 days
 
 ---
 
@@ -114,7 +114,7 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 | V1-07 | Observability stack | P1 | 2 | ✅ Complete | 84 tests, lib/observability/*, /api/health, /api/metrics |
 | V1-08 | Audit logging | P2 | 0.5 | ✅ Complete | 46 tests, lib/audit/*, /api/audit endpoint, vendor isolation |
 | V1-09 | Environment config | P2 | 0.5 | ✅ Complete | 69 tests, lib/config/env.ts, type-safe env access |
-| V1-10 | Integration tests | P2 | 1 | All API endpoints covered |
+| V1-10 | Integration tests | P2 | 1 | ✅ Complete | 20 tests, direct route handler testing |
 | V1-11 | E2E tests with Playwright | P3 | 1 | Critical paths covered |
 | V1-12 | k6 load testing scripts | P3 | 0.5 | Performance baselines |
 | V1-13 | CI/CD pipeline (GitHub Actions) | P3 | 1 | Auto-deploy to Vercel |
@@ -180,6 +180,10 @@ The following moonshot features can be enabled via `/features`:
 
 | Date | Task ID | Task | Notes |
 |------|---------|------|-------|
+| Dec 6 | V1-10 | Integration Tests | 20 tests, direct route handler testing, uses TEST-02 utilities |
+| Dec 6 | TEST-02 | Shared Test Utilities | 30 tests, TestDataTracker, createTestVendor/ApiKey, cleanupTestData |
+| Dec 6 | TEST-01 | Vitest Environments | 23 tests, node + jsdom environment standardization |
+| Dec 6 | DOCS | Documentation Overhaul | README.md, docs/API.md, docs/DEPLOYMENT.md, .claude/INDEX.md |
 | Dec 6 | V1-09 | Environment Config | 69 tests, lib/config/env.ts, Zod validation, type-safe env access, production/dev/test requirements |
 | Dec 5 | V1-08 | Audit Logging | 46 tests, lib/audit/*, /api/audit endpoint with auth, vendor isolation, query filtering, PII redaction in details |
 | Dec 5 | V1-07 | Observability Stack | 84 tests, lib/observability/*, Pino logging with PII redaction, Sentry error tracking, Prometheus metrics, /api/health + /api/metrics endpoints |
@@ -221,9 +225,9 @@ The following moonshot features can be enabled via `/features`:
 | Version | Description | Status |
 |---------|-------------|--------|
 | MVP | Demo-ready for LAUSD presentations | ✅ Complete (10/10) - 1070 tests |
-| v1.0-hardening | Database schema implementation | ✅ ALL COMPLETE (9/9) - 2829 tests |
-| TEST-INFRA | Testing infrastructure sprint | 📋 Planned (2-3 days) |
-| v1.0 | Production-ready with auth & rate limiting | 📋 Planned |
+| v1.0-hardening | Database schema implementation | ✅ Complete (9/9) - 2829 tests |
+| TEST-INFRA | Testing infrastructure sprint | 🚧 In Progress (2/5) - 53 tests added |
+| v1.0 | Production-ready with auth & rate limiting | 🚧 In Progress (10/15) - 3192 tests |
 | v1.5 | Multi-protocol sandbox suite | 📋 Planned |
 | v2.0 | Full moonshot features | 📋 Planned |
 
