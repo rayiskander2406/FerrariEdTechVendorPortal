@@ -92,10 +92,10 @@ This is the **master task list** for the SchoolDay Vendor Integration Portal.
 | TEST-01 | Standardize vitest environments | P1 | S | ✅ Complete | 23 tests, node + jsdom |
 | TEST-02 | Create tests/utils/ shared utilities | P1 | S | ✅ Complete | 30 tests, TestDataTracker, factories |
 | TEST-03 | Add contract tests for API routes | P1 | M | ✅ Complete | 29 tests, Zod schemas, TDD design |
-| TEST-04 | Document TESTING_PATTERNS.md | P2 | S | 📋 Planned | When static analysis vs runtime |
+| TEST-04 | Document TESTING_PATTERNS.md | P2 | S | ✅ Complete | docs/TESTING_PATTERNS.md |
 | TEST-05 | Convert remaining complex mocks | P2 | M | 📋 Planned | Apply static analysis to sandbox/SSO |
 
-**Status**: 3/5 Complete | **Total Effort**: 2-3 days
+**Status**: 4/5 Complete | **Total Effort**: 2-3 days
 
 ---
 
@@ -180,6 +180,7 @@ The following moonshot features can be enabled via `/features`:
 
 | Date | Task ID | Task | Notes |
 |------|---------|------|-------|
+| Dec 6 | TEST-04 | Testing Patterns Documentation | docs/TESTING_PATTERNS.md - static analysis vs runtime, test data management, contract testing |
 | Dec 6 | TEST-03 | Contract Tests | 29 tests, Zod schemas for API contracts, TDD design |
 | Dec 6 | V1-10 | Integration Tests | 20 tests, direct route handler testing, uses TEST-02 utilities |
 | Dec 6 | TEST-02 | Shared Test Utilities | 30 tests, TestDataTracker, createTestVendor/ApiKey, cleanupTestData |
