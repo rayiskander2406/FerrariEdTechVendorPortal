@@ -11,17 +11,18 @@ import { cn } from "@/lib/utils";
 // BASE SKELETON
 // =============================================================================
 
-interface SkeletonProps {
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
 }
 
-export function Skeleton({ className }: SkeletonProps) {
+export function Skeleton({ className, ...props }: SkeletonProps) {
   return (
     <div
       className={cn(
         "bg-gray-200 rounded animate-pulse",
         className
       )}
+      {...props}
     />
   );
 }

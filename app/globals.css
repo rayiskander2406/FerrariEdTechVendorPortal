@@ -2,17 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 /* =============================================================================
    ANIMATIONS
    ============================================================================= */
@@ -214,5 +203,143 @@ body {
   select,
   textarea {
     font-size: 16px;
+  }
+}
+
+
+
+@layer base {
+  :root {
+    /* ==========================================================================
+       PORTAL 2.0 DESIGN TOKENS - LAUSD Brand Colors
+       ========================================================================== */
+
+    /* LAUSD Brand: Blue #003DA5 → HSL 216 100% 32% */
+    --lausd-blue: 216 100% 32%;
+    --lausd-blue-dark: 216 100% 20%;
+    --lausd-blue-light: 216 100% 95%;
+
+    /* LAUSD Brand: Gold #FDB813 → HSL 43 98% 53% */
+    --lausd-gold: 43 98% 53%;
+    --lausd-gold-dark: 43 98% 40%;
+    --lausd-gold-light: 43 98% 90%;
+
+    /* Core Theme Colors */
+    --background: 0 0% 100%;
+    --foreground: 220 14% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 10%;
+
+    /* Primary = LAUSD Blue */
+    --primary: 216 100% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary = Neutral gray for secondary actions */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 14% 10%;
+
+    /* Muted = Subdued backgrounds */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 14% 46%;
+
+    /* Accent = LAUSD Gold for highlights */
+    --accent: 43 98% 53%;
+    --accent-foreground: 220 14% 10%;
+
+    /* Destructive = Error states */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 220 14% 90%;
+    --input: 220 14% 90%;
+    --ring: 216 100% 32%;
+
+    /* Status colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 14% 10%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    /* Chart colors - LAUSD themed */
+    --chart-1: 216 100% 32%;
+    --chart-2: 43 98% 53%;
+    --chart-3: 142 76% 36%;
+    --chart-4: 199 89% 48%;
+    --chart-5: 262 83% 58%;
+
+    /* Spacing and radius */
+    --radius: 0.5rem;
+    --sidebar-width: 280px;
+    --ai-panel-width: 384px;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 14% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 220 14% 14%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 220 14% 14%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 216 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 20%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 220 14% 20%;
+    --muted-foreground: 220 14% 65%;
+
+    --accent: 43 98% 53%;
+    --accent-foreground: 220 14% 10%;
+
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 14% 20%;
+    --input: 220 14% 20%;
+    --ring: 216 100% 50%;
+
+    --chart-1: 216 100% 60%;
+    --chart-2: 43 98% 60%;
+    --chart-3: 142 76% 46%;
+    --chart-4: 199 89% 58%;
+    --chart-5: 262 83% 68%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }

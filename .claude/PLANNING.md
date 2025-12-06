@@ -1,10 +1,12 @@
 # PLANNING - SchoolDay Vendor Portal
 
-**Last Updated**: December 5, 2025
+**Last Updated**: December 6, 2025
 **Mission**: Disrupt Clever and become the dominant K-12 integration platform in 18 months
-**Version**: MVP ✅ → v1.0-hardening 🚧 → v1.0 → v2.0 → v3.0 (Market Leader)
+**Version**: MVP ✅ → v1.0-hardening ✅ → v1.0 🚧 → Portal 2.0 📋 → v3.0 (Market Leader)
 
 > **Strategic Context**: Before starting development, read [STRATEGY.md](./STRATEGY.md) for the "True North" - why we chose Ed-Fi as our internal data model, the competitive analysis, and the SSO strategy.
+
+> **Portal 2.0 (Dashboard-First UX)**: The definitive release plan for transforming from chat-first to dashboard-first with AI augmentation is in [PORTAL_2.0_RELEASE_PLAN.md](./PORTAL_2.0_RELEASE_PLAN.md). This includes all UX decisions, AI touchpoint specifications, 10-week implementation phases, and GO/NO-GO gates.
 
 ---
 
@@ -1636,9 +1638,16 @@ Strategic: District Admin Portal
 Strategic: EdTech Credit Bureau
 └── vendor-marketplace
 
-v2.0+ (Future Vision)
+Portal 2.0 (Dashboard-First UX) → See PORTAL_2.0_RELEASE_PLAN.md
+├── Dashboard layout with sidebar navigation
+├── AI Assistant slide-in panel
+├── 6 AI touchpoints (error diagnosis, API explainer, etc.)
+└── Onboarding wizard with AI guidance
+
+v2.1+ (Post-Portal 2.0)
 ├── teacher-feedback
 ├── parent-transparency
+├── dark mode
 └── impact-analytics
 ```
 
